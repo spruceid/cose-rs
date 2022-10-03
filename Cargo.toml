@@ -1,11 +1,11 @@
 [package]
-name = "cose"
+name = "cose-rs"
 version = "0.1.0"
 edition = "2021"
-description = "RFC-8152 implementation in Rust."
+description = "Pure rust implemenation of RFC-8152, using the `Signer` and `Verifier` traits from RustCrypto's `signature` crate to abstract over cryptographic backend."
 readme = "README.md"
-homepage = "https://github.com/spruceid/cosy"
-repository = "https://github.com/spruceid/cosy"
+homepage = "https://github.com/spruceid/cose-rs"
+repository = "https://github.com/spruceid/cose-rs"
 license = "Apache-2.0"
 
 [dependencies]
