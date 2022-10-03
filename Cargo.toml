@@ -1,0 +1,20 @@
+[package]
+name = "cose"
+version = "0.1.0"
+edition = "2021"
+description = "RFC-8152 implementation in Rust."
+readme = "README.md"
+homepage = "https://github.com/spruceid/cosy"
+repository = "https://github.com/spruceid/cosy"
+license = "Apache-2.0"
+
+[dependencies]
+serde = { version = "1.0.143", features = ["derive"] }
+serde_bytes = "0.11.7"
+serde_cbor = { version = "0.11.2", features = ["tags"] }
+signature = "1.6.3"
+thiserror = "1.0.36"
+
+[dev-dependencies]
+hex = "0.4.3"
+p256 = { version = "0.11.1", features = ["ecdsa-core"] }
