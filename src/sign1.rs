@@ -190,6 +190,44 @@ impl Builder {
             inner,
         })
     }
+
+    #[cfg(feature = "async")]
+    pub async fn async_sign<S, Sig>(self, s: &S) -> Result<CoseSign1>
+    where
+        S: async_signature::AsyncSigner<Sig>,
+        Sig: Signature + Send + 'static,
+    {
+        let payload = self
+            .payload
+            // If payload is None, use cbor null as payload.
+            .unwrap_or_else(|| ByteBuf::from([246u8]));
+        let to_be_signed = to_be_signed(&self.protected, self.external_aad, payload.as_ref())?;
+        let signature = s
+            .sign_async(&to_be_signed)
+            .await
+            .map_err(Error::Signing)?
+            .as_bytes()
+            .to_vec();
+        let inner = if self.detached {
+            CoseSign1Inner(
+                self.protected,
+                self.unprotected,
+                None,
+                ByteBuf::from(signature),
+            )
+        } else {
+            CoseSign1Inner(
+                self.protected,
+                self.unprotected,
+                Some(payload),
+                ByteBuf::from(signature),
+            )
+        };
+        Ok(CoseSign1 {
+            tagged: self.tagged,
+            inner,
+        })
+    }
 }
 
 fn to_be_signed(
