@@ -1,4 +1,5 @@
-use crate::{header_map::HeaderMap, protected::Protected};
+use crate::algorithm::SignatureAlgorithm;
+pub use crate::{header_map::HeaderMap, protected::Protected};
 use serde::{
     de::{self, Error as DeError},
     ser, Deserialize, Serialize,
@@ -7,6 +8,7 @@ use serde_bytes::ByteBuf;
 use serde_cbor::{tags::Tagged, Value};
 use signature::{Signature, Signer, Verifier};
 
+/// COSE_Sign1 implementation.
 #[derive(Clone, Debug)]
 pub struct CoseSign1 {
     tagged: bool,
@@ -16,6 +18,7 @@ pub struct CoseSign1 {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct CoseSign1Inner(Protected, HeaderMap, Option<ByteBuf>, ByteBuf);
 
+/// Builder for COSE_Sign1.
 #[derive(Clone, Debug, Default)]
 pub struct Builder {
     tagged: bool,
@@ -32,8 +35,6 @@ pub enum Error {
     DoublePayload,
     #[error("the COSE_Sign1 has a detached payload which was not provided to the verify function")]
     NoPayload,
-    #[error("signature is not authentic: {0}")]
-    FailedVerification(signature::Error),
     #[error("signature did not match the structure expected by the verifier: {0}")]
     MalformedSignature(signature::Error),
     #[error("error occurred when signing COSE_Sign1: {0}")]
@@ -46,32 +47,79 @@ pub enum Error {
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
+/// Result for verification of a COSE_Sign1.
+#[derive(Debug)]
+pub enum VerificationResult {
+    Success,
+    Failure(String),
+    Error(Error),
+}
+
 impl CoseSign1 {
+    /// Construct a builder for a new COSE_Sign1.
     pub fn builder() -> Builder {
         Builder::default()
     }
 
+    /// Verify that the signature of a COSE_Sign1 is authentic.
     pub fn verify<V, S>(
         &self,
         verifier: &V,
         detached_payload: Option<Vec<u8>>,
         external_aad: Option<Vec<u8>>,
-    ) -> Result<()>
+    ) -> VerificationResult
     where
-        V: Verifier<S>,
+        V: Verifier<S> + SignatureAlgorithm,
         S: Signature,
     {
+        if let Some(value) = self.inner.0.get_i(1) {
+            match value {
+                Value::Integer(alg_value) => {
+                    if verifier.algorithm().value() as i128 != *alg_value {
+                        return VerificationResult::Failure(
+                            "algorithm in protected headers did not match verifier's algorithm"
+                                .into(),
+                        );
+                    }
+                }
+                Value::Text(alg_value_str) => {
+                    // If alg header does not parse as an i32; ignore and carry on verification.
+                    if let Ok(alg_value) = alg_value_str.parse() {
+                        if verifier.algorithm().value() != alg_value {
+                            return VerificationResult::Failure(
+                                "algorithm in protected headers did not match verifier's algorithm"
+                                    .into(),
+                            );
+                        }
+                    }
+                }
+                // Unexpected type for algorithm header; ignore and carry on verification.
+                _ => {}
+            }
+        }
+
         let payload = match (self.inner.2.as_ref(), detached_payload.as_ref()) {
-            (None, None) => return Err(Error::NoPayload),
+            (None, None) => return VerificationResult::Error(Error::NoPayload),
             (Some(attached), None) => attached,
             (None, Some(detached)) => detached,
-            _ => return Err(Error::DoublePayload),
+            _ => return VerificationResult::Error(Error::DoublePayload),
         };
-        let signature = S::from_bytes(self.inner.3.as_ref()).map_err(Error::MalformedSignature)?;
-        let to_be_verified = to_be_signed(&self.inner.0, external_aad, payload)?;
-        verifier
-            .verify(&to_be_verified, &signature)
-            .map_err(Error::FailedVerification)
+
+        let signature =
+            match S::from_bytes(self.inner.3.as_ref()).map_err(Error::MalformedSignature) {
+                Ok(sig) => sig,
+                Err(e) => return VerificationResult::Error(e),
+            };
+
+        let to_be_verified = match to_be_signed(&self.inner.0, external_aad, payload) {
+            Ok(data) => data,
+            Err(e) => return VerificationResult::Error(e),
+        };
+
+        match verifier.verify(&to_be_verified, &signature) {
+            Ok(()) => VerificationResult::Success,
+            Err(e) => VerificationResult::Failure(format!("signature is not authentic: {}", e)),
+        }
     }
 }
 
@@ -113,16 +161,19 @@ impl<'de> de::Deserialize<'de> for CoseSign1 {
 }
 
 impl Builder {
+    /// Set the tagged flag, so that the generated COSE_Sign1 is serialized with cbor tag 18.
     pub fn tagged(mut self) -> Self {
         self.tagged = true;
         self
     }
 
+    /// Set the detached flag, so that the payload will not be included in the COSE_Sign1.
     pub fn detached(mut self) -> Self {
         self.detached = true;
         self
     }
 
+    /// Set the protected headers.
     pub fn protected<P>(mut self, protected: P) -> Self
     where
         P: Into<Protected>,
@@ -131,6 +182,7 @@ impl Builder {
         self
     }
 
+    /// Set the unprotected headers.
     pub fn unprotected<H>(mut self, unprotected: H) -> Self
     where
         H: Into<HeaderMap>,
@@ -139,6 +191,10 @@ impl Builder {
         self
     }
 
+    /// Set the externally supplied data.
+    ///
+    /// Add some additional data to be signed over that is transported separately from the
+    /// COSE_Sign1 (RFC-8152#Section4.3).
     pub fn external_aad<B>(mut self, external_aad: B) -> Self
     where
         B: Into<Vec<u8>>,
@@ -147,6 +203,7 @@ impl Builder {
         self
     }
 
+    /// Set the payload.
     pub fn payload<P>(mut self, p: P) -> Self
     where
         P: Into<Vec<u8>>,
@@ -155,11 +212,16 @@ impl Builder {
         self
     }
 
-    pub fn sign<S, Sig>(self, s: &S) -> Result<CoseSign1>
+    /// Sign and generate the COSE_Sign1.
+    pub fn sign<S, Sig>(mut self, s: &S) -> Result<CoseSign1>
     where
-        S: Signer<Sig>,
+        S: Signer<Sig> + SignatureAlgorithm,
         Sig: Signature,
     {
+        if self.protected.get_i(1).is_none() {
+            self.protected.insert_i(1, s.algorithm().value().into());
+        }
+
         let payload = self
             .payload
             // If payload is None, use cbor null as payload.
@@ -191,12 +253,17 @@ impl Builder {
         })
     }
 
+    /// Asynchronously sign and generate the COSE_Sign1.
     #[cfg(feature = "async")]
-    pub async fn async_sign<S, Sig>(self, s: &S) -> Result<CoseSign1>
+    pub async fn async_sign<S, Sig>(mut self, s: &S) -> Result<CoseSign1>
     where
-        S: async_signature::AsyncSigner<Sig>,
+        S: async_signature::AsyncSigner<Sig> + SignatureAlgorithm,
         Sig: Signature + Send + 'static,
     {
+        if self.protected.get_i(1).is_none() {
+            self.protected.insert_i(1, s.algorithm().value().into());
+        }
+
         let payload = self
             .payload
             // If payload is None, use cbor null as payload.
@@ -227,6 +294,35 @@ impl Builder {
             tagged: self.tagged,
             inner,
         })
+    }
+}
+
+impl VerificationResult {
+    /// Result of verification.
+    ///
+    /// False implies the signature is inauthentic or the verification algorithm encountered an
+    /// error.
+    pub fn success(&self) -> bool {
+        matches!(self, VerificationResult::Success)
+    }
+
+    /// Translate to a std::result::Result.
+    ///
+    /// Converts failure reasons and errors into a String.
+    pub fn to_result(self) -> Result<(), String> {
+        match self {
+            VerificationResult::Success => Ok(()),
+            VerificationResult::Failure(reason) => Err(reason),
+            VerificationResult::Error(e) => Err(format!("{}", e)),
+        }
+    }
+
+    /// Retrieve the error if the verification algorithm encountered an error.
+    pub fn to_error(self) -> Option<Error> {
+        match self {
+            VerificationResult::Error(e) => Some(e),
+            _ => None,
+        }
     }
 }
 
@@ -276,12 +372,10 @@ mod test {
     fn signing() {
         let bytes = Vec::<u8>::from_hex(COSE_KEY).unwrap();
         let signer: SigningKey = SecretKey::from_be_bytes(&bytes).unwrap().into();
-        let mut protected = HeaderMap::default();
-        protected.insert_i(1, (-7).into());
         let mut unprotected = HeaderMap::default();
         unprotected.insert_i(4, serde_cbor::Value::Bytes("11".into()));
         let cose_sign1 = CoseSign1::builder()
-            .protected(protected)
+            .protected(HeaderMap::default())
             .unprotected(unprotected)
             .payload("This is the content.")
             .tagged()
@@ -309,6 +403,7 @@ mod test {
 
         cose_sign1
             .verify(&verifier, None, None)
+            .to_result()
             .expect("COSE_Sign1 could not be verified")
     }
 }

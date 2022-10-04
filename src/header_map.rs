@@ -3,6 +3,7 @@ use serde_cbor::Value;
 use std::collections::BTreeMap;
 use std::ops::Deref;
 
+/// COSE headers.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct HeaderMap(BTreeMap<Value, Value>);
 

@@ -6,6 +6,7 @@ use serde::{
 use serde_cbor::Value;
 use std::ops::{Deref, DerefMut};
 
+/// Protected headers.
 #[derive(Clone, Debug, Default)]
 pub struct Protected(HeaderMap, Option<Vec<u8>>);
 

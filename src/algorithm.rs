@@ -1,10 +1,13 @@
 use std::convert::TryFrom;
 use std::fmt;
 
+/// Trait to represent the signature algorithm of a signer or verifier.
 pub trait SignatureAlgorithm {
     fn algorithm(&self) -> Algorithm;
 }
 
+/// COSE algorithms from the
+/// [IANA COSE Algorithms registry](https://www.iana.org/assignments/cose/cose.xhtml#algorithms).
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum Algorithm {
     RS1,
@@ -74,6 +77,7 @@ pub enum Algorithm {
 }
 
 impl Algorithm {
+    /// Name of the algorithm according to the IANA COSE Algorithms registry.
     pub fn name(&self) -> &'static str {
         match self {
             Algorithm::RS1 => "RS1",
@@ -143,6 +147,7 @@ impl Algorithm {
         }
     }
 
+    /// Description of the algorithm according to the IANA COSE Algorithms registry.
     pub fn description(&self) -> &'static str {
         match self {
             Algorithm::RS1 => "RSASSA-PKCS1-v1_5 using SHA-1",
@@ -212,6 +217,7 @@ impl Algorithm {
         }
     }
 
+    /// CBOR representation of the algorithm according to the IANA COSE Algorithms registry.
     pub fn value(&self) -> i32 {
         match self {
             Algorithm::RS1 => -65535,
