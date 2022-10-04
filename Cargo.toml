@@ -9,10 +9,15 @@ repository = "https://github.com/spruceid/cose-rs"
 license = "Apache-2.0"
 
 [features]
+default = ["p256", "p384"]
 async = ["async-signature"]
+p256 = ["dep:p256"]
+p384 = ["dep:p384"]
 
 [dependencies]
 async-signature = { version = "0.2.1", optional = true }
+p256 = { version = "0.11.1", features = ["ecdsa-core"], optional = true }
+p384 = { version = "0.11.2", features = ["ecdsa-core"], optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_bytes = "0.11.7"
 serde_cbor = { version = "0.11.2", features = ["tags"] }
