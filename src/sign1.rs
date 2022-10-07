@@ -121,6 +121,21 @@ impl CoseSign1 {
             Err(e) => VerificationResult::Failure(format!("signature is not authentic: {}", e)),
         }
     }
+
+    /// Retrieve the protected headers.
+    pub fn protected(&self) -> &Protected {
+        &self.inner.0
+    }
+
+    /// Retrieve the unprotected headers.
+    pub fn unprotected(&self) -> &HeaderMap {
+        &self.inner.1
+    }
+
+    /// Retrieve the payload if it is attached.
+    pub fn payload(&self) -> Option<&ByteBuf> {
+        self.inner.2.as_ref()
+    }
 }
 
 impl ser::Serialize for CoseSign1 {
