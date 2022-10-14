@@ -1,4 +1,4 @@
-use crate::algorithm::SignatureAlgorithm;
+use crate::algorithm::{Algorithm, SignatureAlgorithm};
 pub use crate::{header_map::HeaderMap, protected::Protected};
 use serde::{
     de::{self, Error as DeError},
@@ -15,6 +15,33 @@ pub struct CoseSign1 {
     inner: CoseSign1Inner,
 }
 
+/// Prepared COSE_Sign1 for remote signing.
+///
+/// To produce a COSE_Sign1 do the following:
+///
+/// 1. Set the siganture algorithm in the builder using [`Builder::signature_algorithm`].
+/// 2. Produce a signature remotely according to the chosen signature algorithm,
+///    using the [`Self::signature_payload`] as the payload.
+/// 3. Generate the COSE_Sign1 by passing the produced signature into
+///    [`Self::finalize`].
+///
+/// Example:
+/// ```ignore
+/// let builder = builder.signature_algorithm(Algorithm::ES256);
+/// let prepared: PreparedCoseSign1 = builder.prepare()?;
+/// let signature_payload = prepared.signature_payload();
+/// let signature = /* produce a signature according to ES256 using signature_payload as the payload */;
+/// let cose_sign1: CoseSign1 = prepared.finalize(signature);
+/// ```
+#[derive(Clone, Debug)]
+pub struct PreparedCoseSign1 {
+    tagged: bool,
+    protected: Protected,
+    unprotected: HeaderMap,
+    payload: Option<ByteBuf>,
+    signature_payload: Vec<u8>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct CoseSign1Inner(Protected, HeaderMap, Option<ByteBuf>, ByteBuf);
 
@@ -29,6 +56,7 @@ pub struct Builder {
     payload: Option<ByteBuf>,
 }
 
+/// Errors that can occur when building, signing or verifying a COSE_Sign1.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("the COSE_Sign1 has an attached payload but an detached payload was provided to the verify function")]
@@ -41,10 +69,11 @@ pub enum Error {
     Signing(signature::Error),
     #[error("unable to serialize COSE_Sign1 protected headers: {0}")]
     UnableToSerializeProtected(serde_cbor::Error),
-    #[error("unable to serialize COSE_Sign1 signature structure: {0}")]
-    UnableToSerializeSigStructure(serde_cbor::Error),
+    #[error("unable to serialize COSE_Sign1 signature payload: {0}")]
+    UnableToSerializeSignaturePayload(serde_cbor::Error),
 }
 
+/// Result with error type: [`Error`].
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Result for verification of a COSE_Sign1.
@@ -111,12 +140,12 @@ impl CoseSign1 {
                 Err(e) => return VerificationResult::Error(e),
             };
 
-        let to_be_verified = match to_be_signed(&self.inner.0, external_aad, payload) {
+        let signature_payload = match signature_payload(&self.inner.0, external_aad, payload) {
             Ok(data) => data,
             Err(e) => return VerificationResult::Error(e),
         };
 
-        match verifier.verify(&to_be_verified, &signature) {
+        match verifier.verify(&signature_payload, &signature) {
             Ok(()) => VerificationResult::Success,
             Err(e) => VerificationResult::Failure(format!("signature is not authentic: {}", e)),
         }
@@ -227,6 +256,43 @@ impl Builder {
         self
     }
 
+    /// Set the signature algorithm in the protected headers.
+    ///
+    /// This is not required if signing directly as it can be derived from the signer,
+    /// but should be set if using [`Self::prepare`] and producing the signature remotely.
+    pub fn signature_algorithm(mut self, algorithm: Algorithm) -> Self {
+        self.protected.insert_i(1, algorithm.value().into());
+        self
+    }
+
+    /// Prepare a CoseSign1 for remote signing.
+    pub fn prepare(self) -> Result<PreparedCoseSign1> {
+        let payload = self
+            .payload
+            // If payload is None, use cbor null as payload.
+            .unwrap_or_else(|| ByteBuf::from([246u8]));
+        let signature_payload =
+            signature_payload(&self.protected, self.external_aad, payload.as_ref())?;
+        let prepared = if self.detached {
+            PreparedCoseSign1 {
+                tagged: self.tagged,
+                protected: self.protected,
+                unprotected: self.unprotected,
+                payload: None,
+                signature_payload,
+            }
+        } else {
+            PreparedCoseSign1 {
+                tagged: self.tagged,
+                protected: self.protected,
+                unprotected: self.unprotected,
+                payload: Some(payload),
+                signature_payload,
+            }
+        };
+        Ok(prepared)
+    }
+
     /// Sign and generate the COSE_Sign1.
     pub fn sign<S, Sig>(mut self, s: &S) -> Result<CoseSign1>
     where
@@ -236,41 +302,19 @@ impl Builder {
         if self.protected.get_i(1).is_none() {
             self.protected.insert_i(1, s.algorithm().value().into());
         }
-
-        let payload = self
-            .payload
-            // If payload is None, use cbor null as payload.
-            .unwrap_or_else(|| ByteBuf::from([246u8]));
-        let to_be_signed = to_be_signed(&self.protected, self.external_aad, payload.as_ref())?;
+        let prepared = self.prepare()?;
+        let signature_payload = prepared.signature_payload();
         let signature = s
-            .try_sign(&to_be_signed)
+            .try_sign(signature_payload)
             .map_err(Error::Signing)?
             .as_bytes()
             .to_vec();
-        let inner = if self.detached {
-            CoseSign1Inner(
-                self.protected,
-                self.unprotected,
-                None,
-                ByteBuf::from(signature),
-            )
-        } else {
-            CoseSign1Inner(
-                self.protected,
-                self.unprotected,
-                Some(payload),
-                ByteBuf::from(signature),
-            )
-        };
-        Ok(CoseSign1 {
-            tagged: self.tagged,
-            inner,
-        })
+        Ok(prepared.finalize(signature))
     }
 
     /// Asynchronously sign and generate the COSE_Sign1.
     #[cfg(feature = "async")]
-    pub async fn async_sign<S, Sig>(mut self, s: &S) -> Result<CoseSign1>
+    pub async fn sign_async<S, Sig>(mut self, s: &S) -> Result<CoseSign1>
     where
         S: async_signature::AsyncSigner<Sig> + SignatureAlgorithm,
         Sig: Signature + Send + 'static,
@@ -278,37 +322,36 @@ impl Builder {
         if self.protected.get_i(1).is_none() {
             self.protected.insert_i(1, s.algorithm().value().into());
         }
-
-        let payload = self
-            .payload
-            // If payload is None, use cbor null as payload.
-            .unwrap_or_else(|| ByteBuf::from([246u8]));
-        let to_be_signed = to_be_signed(&self.protected, self.external_aad, payload.as_ref())?;
+        let prepared = self.prepare()?;
+        let signature_payload = prepared.signature_payload();
         let signature = s
-            .sign_async(&to_be_signed)
+            .sign_async(signature_payload)
             .await
             .map_err(Error::Signing)?
             .as_bytes()
             .to_vec();
-        let inner = if self.detached {
-            CoseSign1Inner(
-                self.protected,
-                self.unprotected,
-                None,
-                ByteBuf::from(signature),
-            )
-        } else {
-            CoseSign1Inner(
-                self.protected,
-                self.unprotected,
-                Some(payload),
-                ByteBuf::from(signature),
-            )
-        };
-        Ok(CoseSign1 {
+        Ok(prepared.finalize(signature))
+    }
+}
+
+impl PreparedCoseSign1 {
+    /// Retrieve the signature payload, i.e. the data that must be signed over.
+    pub fn signature_payload(&self) -> &[u8] {
+        self.signature_payload.as_slice()
+    }
+
+    /// Finalise the PreparedCoseSign1 with a remotely signed signature.
+    pub fn finalize(self, signature: Vec<u8>) -> CoseSign1 {
+        let inner = CoseSign1Inner(
+            self.protected,
+            self.unprotected,
+            self.payload,
+            ByteBuf::from(signature),
+        );
+        CoseSign1 {
             tagged: self.tagged,
             inner,
-        })
+        }
     }
 }
 
@@ -341,7 +384,7 @@ impl VerificationResult {
     }
 }
 
-fn to_be_signed(
+fn signature_payload(
     protected: &Protected,
     external_aad: Option<Vec<u8>>,
     payload: &[u8],
@@ -355,7 +398,7 @@ fn to_be_signed(
         Value::Bytes(external_aad.unwrap_or_default()),
         Value::Bytes(payload.to_vec()),
     ])
-    .map_err(Error::UnableToSerializeSigStructure)
+    .map_err(Error::UnableToSerializeSignaturePayload)
 }
 
 #[cfg(test)]
@@ -416,6 +459,41 @@ mod test {
         let cose_sign1: CoseSign1 = serde_cbor::from_slice(&cose_sign1_bytes)
             .expect("failed to parse COSE_Sign1 from bytes");
 
+        cose_sign1
+            .verify(&verifier, None, None)
+            .to_result()
+            .expect("COSE_Sign1 could not be verified")
+    }
+
+    #[test]
+    fn remote_signed() {
+        let bytes = Vec::<u8>::from_hex(COSE_KEY).unwrap();
+        let signer: SigningKey = SecretKey::from_be_bytes(&bytes).unwrap().into();
+        let mut unprotected = HeaderMap::default();
+        unprotected.insert_i(4, serde_cbor::Value::Bytes("11".into()));
+        let prepared = CoseSign1::builder()
+            .protected(HeaderMap::default())
+            .unprotected(unprotected)
+            .payload("This is the content.")
+            .tagged()
+            .signature_algorithm(Algorithm::ES256)
+            .prepare()
+            .unwrap();
+        let signature = signer
+            .sign(prepared.signature_payload())
+            .as_bytes()
+            .to_vec();
+        let cose_sign1 = prepared.finalize(signature);
+        let serialized =
+            serde_cbor::to_vec(&cose_sign1).expect("failed to serialize COSE_Sign1 to bytes");
+
+        let expected = Vec::<u8>::from_hex(COSE_SIGN1).unwrap();
+        assert_eq!(
+            expected, serialized,
+            "expected COSE_Sign1 and signed data do not match"
+        );
+
+        let verifier: VerifyingKey = (&signer).into();
         cose_sign1
             .verify(&verifier, None, None)
             .to_result()
