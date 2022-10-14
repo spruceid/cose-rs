@@ -23,7 +23,7 @@ pub struct CoseSign1 {
 /// 2. Produce a signature remotely according to the chosen signature algorithm,
 ///    using the [`Self::signature_payload`] as the payload.
 /// 3. Generate the COSE_Sign1 by passing the produced signature into
-///    [`Self::finalise`].
+///    [`Self::finalize`].
 ///
 /// Example:
 /// ```ignore
@@ -31,7 +31,7 @@ pub struct CoseSign1 {
 /// let prepared: PreparedCoseSign1 = builder.prepare()?;
 /// let signature_payload = prepared.signature_payload();
 /// let signature = /* produce a signature according to ES256 using signature_payload as the payload */;
-/// let cose_sign1: CoseSign1 = prepared.finalise(signature);
+/// let cose_sign1: CoseSign1 = prepared.finalize(signature);
 /// ```
 #[derive(Clone, Debug)]
 pub struct PreparedCoseSign1 {
@@ -309,7 +309,7 @@ impl Builder {
             .map_err(Error::Signing)?
             .as_bytes()
             .to_vec();
-        Ok(prepared.finalise(signature))
+        Ok(prepared.finalize(signature))
     }
 
     /// Asynchronously sign and generate the COSE_Sign1.
@@ -330,7 +330,7 @@ impl Builder {
             .map_err(Error::Signing)?
             .as_bytes()
             .to_vec();
-        Ok(prepared.finalise(signature))
+        Ok(prepared.finalize(signature))
     }
 }
 
@@ -341,7 +341,7 @@ impl PreparedCoseSign1 {
     }
 
     /// Finalise the PreparedCoseSign1 with a remotely signed signature.
-    pub fn finalise(self, signature: Vec<u8>) -> CoseSign1 {
+    pub fn finalize(self, signature: Vec<u8>) -> CoseSign1 {
         let inner = CoseSign1Inner(
             self.protected,
             self.unprotected,
@@ -483,7 +483,7 @@ mod test {
             .sign(prepared.signature_payload())
             .as_bytes()
             .to_vec();
-        let cose_sign1 = prepared.finalise(signature);
+        let cose_sign1 = prepared.finalize(signature);
         let serialized =
             serde_cbor::to_vec(&cose_sign1).expect("failed to serialize COSE_Sign1 to bytes");
 
