@@ -26,7 +26,7 @@ pub struct CoseSign1 {
 ///    [`Self::finalise`].
 ///
 /// Example:
-/// ```compile_fail
+/// ```ignore
 /// let builder = builder.signature_algorithm(Algorithm::ES256);
 /// let prepared: PreparedCoseSign1 = builder.prepare()?;
 /// let signature_payload = prepared.signature_payload();
