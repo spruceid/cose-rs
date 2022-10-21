@@ -33,7 +33,7 @@ pub struct CoseSign1 {
 /// let signature = /* produce a signature according to ES256 using signature_payload as the payload */;
 /// let cose_sign1: CoseSign1 = prepared.finalize(signature);
 /// ```
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PreparedCoseSign1 {
     tagged: bool,
     protected: Protected,
