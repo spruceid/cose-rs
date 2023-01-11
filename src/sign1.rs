@@ -113,7 +113,7 @@ impl CoseSign1 {
                 }
                 Value::Text(alg_value_str) => {
                     // If alg header does not parse as an i32; ignore and carry on verification.
-                    if let Ok(alg_value) = alg_value_str.parse() {
+                    if let Ok(alg_value) = alg_value_str.parse::<i32>() {
                         if verifier.algorithm().value() != alg_value {
                             return VerificationResult::Failure(
                                 "algorithm in protected headers did not match verifier's algorithm"
