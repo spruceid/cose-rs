@@ -19,7 +19,7 @@ pub struct CoseSign1 {
 ///
 /// To produce a COSE_Sign1 do the following:
 ///
-/// 1. Set the siganture algorithm in the builder using [`Builder::signature_algorithm`].
+/// 1. Set the signature algorithm in the builder using [`Builder::signature_algorithm`].
 /// 2. Produce a signature remotely according to the chosen signature algorithm,
 ///    using the [`Self::signature_payload`] as the payload.
 /// 3. Generate the COSE_Sign1 by passing the produced signature into
@@ -159,6 +159,11 @@ impl CoseSign1 {
     /// Retrieve the unprotected headers.
     pub fn unprotected(&self) -> &HeaderMap {
         &self.inner.1
+    }
+
+    /// Retrieve a mutable reference to the unprotected headers.
+    pub fn unprotected_mut(&mut self) -> &mut HeaderMap {
+        &mut self.inner.1
     }
 
     /// Retrieve the payload if it is attached.
