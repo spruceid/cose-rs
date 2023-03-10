@@ -15,15 +15,15 @@ p256 = ["dep:p256"]
 p384 = ["dep:p384"]
 
 [dependencies]
-async-signature = { version = "0.2.1", optional = true }
-p256 = { version = "0.11.1", features = ["ecdsa-core"], optional = true }
-p384 = { version = "0.11.2", features = ["ecdsa-core"], optional = true }
+async-signature = { version = "0.3.0", optional = true }
+p256 = { version = "0.13.0", optional = true }
+p384 = { version = "0.13.0", optional = true }
 serde = { version = "1.0", features = ["derive"] }
-serde_bytes = "0.11.7"
+serde_bytes = "0.11.9"
 serde_cbor = { version = "0.11.2", features = ["tags"] }
-signature = "1.6"
+signature = "2.0"
 thiserror = "1.0"
 
 [dev-dependencies]
 hex = "0.4.3"
-p256 = { version = "0.11.1", features = ["ecdsa-core"] }
+p256 = { version = "0.13.0" }

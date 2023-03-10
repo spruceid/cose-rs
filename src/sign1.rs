@@ -6,7 +6,7 @@ use serde::{
 };
 use serde_bytes::ByteBuf;
 use serde_cbor::{tags::Tagged, Value};
-use signature::{Signature, Signer, Verifier};
+use signature::{SignatureEncoding, Signer, Verifier};
 
 /// COSE_Sign1 implementation.
 #[derive(Clone, Debug)]
@@ -91,15 +91,16 @@ impl CoseSign1 {
     }
 
     /// Verify that the signature of a COSE_Sign1 is authentic.
-    pub fn verify<V, S>(
-        &self,
+    pub fn verify<'a, V, S>(
+        &'a self,
         verifier: &V,
         detached_payload: Option<Vec<u8>>,
         external_aad: Option<Vec<u8>>,
     ) -> VerificationResult
     where
         V: Verifier<S> + SignatureAlgorithm,
-        S: Signature,
+        S: TryFrom<&'a [u8]>,
+        S::Error: Into<signature::Error>,
     {
         if let Some(value) = self.inner.0.get_i(1) {
             match value {
@@ -134,11 +135,13 @@ impl CoseSign1 {
             _ => return VerificationResult::Error(Error::DoublePayload),
         };
 
-        let signature =
-            match S::from_bytes(self.inner.3.as_ref()).map_err(Error::MalformedSignature) {
-                Ok(sig) => sig,
-                Err(e) => return VerificationResult::Error(e),
-            };
+        let signature = match S::try_from(self.inner.3.as_ref())
+            .map_err(Into::into)
+            .map_err(Error::MalformedSignature)
+        {
+            Ok(sig) => sig,
+            Err(e) => return VerificationResult::Error(e),
+        };
 
         let signature_payload = match signature_payload(&self.inner.0, external_aad, payload) {
             Ok(data) => data,
@@ -302,7 +305,7 @@ impl Builder {
     pub fn sign<S, Sig>(mut self, s: &S) -> Result<CoseSign1>
     where
         S: Signer<Sig> + SignatureAlgorithm,
-        Sig: Signature,
+        Sig: SignatureEncoding,
     {
         if self.protected.get_i(1).is_none() {
             self.protected.insert_i(1, s.algorithm().value().into());
@@ -312,7 +315,6 @@ impl Builder {
         let signature = s
             .try_sign(signature_payload)
             .map_err(Error::Signing)?
-            .as_bytes()
             .to_vec();
         Ok(prepared.finalize(signature))
     }
@@ -322,7 +324,7 @@ impl Builder {
     pub async fn sign_async<S, Sig>(mut self, s: &S) -> Result<CoseSign1>
     where
         S: async_signature::AsyncSigner<Sig> + SignatureAlgorithm,
-        Sig: Signature + Send + 'static,
+        Sig: SignatureEncoding + Send + 'static,
     {
         if self.protected.get_i(1).is_none() {
             self.protected.insert_i(1, s.algorithm().value().into());
@@ -333,7 +335,6 @@ impl Builder {
             .sign_async(signature_payload)
             .await
             .map_err(Error::Signing)?
-            .as_bytes()
             .to_vec();
         Ok(prepared.finalize(signature))
     }
@@ -411,7 +412,7 @@ mod test {
     use super::*;
     use hex::FromHex;
     use p256::{
-        ecdsa::{SigningKey, VerifyingKey},
+        ecdsa::{Signature, SigningKey, VerifyingKey},
         SecretKey,
     };
 
@@ -434,7 +435,7 @@ mod test {
     #[test]
     fn signing() {
         let bytes = Vec::<u8>::from_hex(COSE_KEY).unwrap();
-        let signer: SigningKey = SecretKey::from_be_bytes(&bytes).unwrap().into();
+        let signer: SigningKey = SecretKey::from_slice(&bytes).unwrap().into();
         let mut unprotected = HeaderMap::default();
         unprotected.insert_i(4, serde_cbor::Value::Bytes("11".into()));
         let cose_sign1 = CoseSign1::builder()
@@ -442,7 +443,7 @@ mod test {
             .unprotected(unprotected)
             .payload("This is the content.")
             .tagged()
-            .sign(&signer)
+            .sign::<SigningKey, Signature>(&signer)
             .unwrap();
         let serialized =
             serde_cbor::to_vec(&cose_sign1).expect("failed to serialize COSE_Sign1 to bytes");
@@ -457,7 +458,7 @@ mod test {
     #[test]
     fn verifying() {
         let bytes = Vec::<u8>::from_hex(COSE_KEY).unwrap();
-        let signer: SigningKey = SecretKey::from_be_bytes(&bytes).unwrap().into();
+        let signer: SigningKey = SecretKey::from_slice(&bytes).unwrap().into();
         let verifier: VerifyingKey = (&signer).into();
 
         let cose_sign1_bytes = Vec::<u8>::from_hex(COSE_SIGN1).unwrap();
@@ -465,7 +466,7 @@ mod test {
             .expect("failed to parse COSE_Sign1 from bytes");
 
         cose_sign1
-            .verify(&verifier, None, None)
+            .verify::<VerifyingKey, Signature>(&verifier, None, None)
             .to_result()
             .expect("COSE_Sign1 could not be verified")
     }
@@ -473,7 +474,7 @@ mod test {
     #[test]
     fn remote_signed() {
         let bytes = Vec::<u8>::from_hex(COSE_KEY).unwrap();
-        let signer: SigningKey = SecretKey::from_be_bytes(&bytes).unwrap().into();
+        let signer: SigningKey = SecretKey::from_slice(&bytes).unwrap().into();
         let mut unprotected = HeaderMap::default();
         unprotected.insert_i(4, serde_cbor::Value::Bytes("11".into()));
         let prepared = CoseSign1::builder()
@@ -484,11 +485,8 @@ mod test {
             .signature_algorithm(Algorithm::ES256)
             .prepare()
             .unwrap();
-        let signature = signer
-            .sign(prepared.signature_payload())
-            .as_bytes()
-            .to_vec();
-        let cose_sign1 = prepared.finalize(signature);
+        let signature: Signature = signer.sign(prepared.signature_payload());
+        let cose_sign1 = prepared.finalize(signature.to_vec());
         let serialized =
             serde_cbor::to_vec(&cose_sign1).expect("failed to serialize COSE_Sign1 to bytes");
 
@@ -500,7 +498,7 @@ mod test {
 
         let verifier: VerifyingKey = (&signer).into();
         cose_sign1
-            .verify(&verifier, None, None)
+            .verify::<VerifyingKey, Signature>(&verifier, None, None)
             .to_result()
             .expect("COSE_Sign1 could not be verified")
     }
