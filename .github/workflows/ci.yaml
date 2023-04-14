@@ -8,6 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-Dwarnings" 
 
 jobs:
   build:
@@ -23,7 +24,7 @@ jobs:
       run: cargo test --all-features
 
     - name: Clippy
-      run: RUSTFLAGS="-Dwarnings" cargo clippy --all-features
+      run: cargo clippy --all-features
 
     - name: Fmt
       run: cargo fmt -- --check
