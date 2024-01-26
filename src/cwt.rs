@@ -4,7 +4,7 @@ use serde_cbor::Value;
 use std::collections::BTreeMap;
 use std::ops::Deref;
 
-pub use crate::claim::IANAClaim;
+pub use crate::claim::Claim;
 
 /// CWT claims set.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -18,7 +18,7 @@ impl ClaimsSet {
         self.0.insert(Value::Integer(i), value)
     }
 
-    pub fn insert_claim(&mut self, claim: IANAClaim) -> Option<Value> {
+    pub fn insert_claim(&mut self, claim: Claim) -> Option<Value> {
         self.insert_i(claim.key(), claim.value())
     }
 
@@ -70,13 +70,13 @@ mod test {
     fn serialize_payload() {
         // Example from RFC8392
         let mut claims_set = ClaimsSet::default();
-        claims_set.insert_claim(IANAClaim::Issuer("coap://as.example.com"));
-        claims_set.insert_claim(IANAClaim::Subject("erikw"));
-        claims_set.insert_claim(IANAClaim::Audience("coap://light.example.com"));
-        claims_set.insert_claim(IANAClaim::ExpirationTime(1444064944));
-        claims_set.insert_claim(IANAClaim::NotBefore(1443944944));
-        claims_set.insert_claim(IANAClaim::IssuedAt(1443944944));
-        claims_set.insert_claim(IANAClaim::CWTId(hex::decode("0b71").unwrap()));
+        claims_set.insert_claim(Claim::Issuer("coap://as.example.com"));
+        claims_set.insert_claim(Claim::Subject("erikw"));
+        claims_set.insert_claim(Claim::Audience("coap://light.example.com"));
+        claims_set.insert_claim(Claim::ExpirationTime(1444064944));
+        claims_set.insert_claim(Claim::NotBefore(1443944944));
+        claims_set.insert_claim(Claim::IssuedAt(1443944944));
+        claims_set.insert_claim(Claim::CWTId(hex::decode("0b71").unwrap()));
 
         let serialized = claims_set
             .serialize()
