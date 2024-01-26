@@ -82,3 +82,31 @@ impl From<BTreeMap<Value, Value>> for ClaimsSet {
 // TODO EN: probably needs to implement the From trait for adding to payload to work properly
 
 // TODO EN: create a test for creating the serialized payload (or whatever gets added to the message)
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn serialize_payload() {
+        // Example from RFC8392
+        let mut claims_set = ClaimsSet::default();
+        claims_set.insert_i(1, serde_cbor::Value::Text("coap://as.example.com".into()));
+        claims_set.insert_i(2, serde_cbor::Value::Text("erikw".into()));
+        claims_set.insert_i(
+            3,
+            serde_cbor::Value::Text("coap://light.example.com".into()),
+        );
+        claims_set.insert_i(4, serde_cbor::Value::Integer(1444064944));
+        claims_set.insert_i(5, serde_cbor::Value::Integer(1443944944));
+        claims_set.insert_i(6, serde_cbor::Value::Integer(1443944944));
+        claims_set.insert_i(7, serde_cbor::Value::Bytes(hex::decode("0b71").unwrap()));
+
+        let serialized = claims_set
+            .serialize()
+            .expect("failed to serialize claims set");
+        let expected = hex::decode("a70175636f61703a2f2f61732e6578616d706c652e636f6d02656572696b77037818636f61703a2f2f6c696768742e6578616d706c652e636f6d041a5612aeb0051a5610d9f0061a5610d9f007420b71").unwrap();
+        // println!("serialized: {}", hex::encode(&serialized));
+        assert_eq!(serialized, expected);
+    }
+}
