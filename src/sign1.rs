@@ -409,6 +409,8 @@ fn signature_payload(
 
 #[cfg(test)]
 mod test {
+    use crate::claims_set::{self, ClaimsSet};
+
     use super::*;
     use hex::FromHex;
     use p256::{
@@ -501,5 +503,33 @@ mod test {
             .verify::<VerifyingKey, Signature>(&verifier, None, None)
             .to_result()
             .expect("COSE_Sign1 could not be verified")
+    }
+
+    #[test]
+    fn cwt_signing() {
+        let bytes = Vec::<u8>::from_hex(COSE_KEY).unwrap();
+        let signer: SigningKey = SecretKey::from_slice(&bytes).unwrap().into();
+        let mut unprotected = HeaderMap::default();
+        unprotected.insert_i(4, serde_cbor::Value::Bytes("11".into()));
+
+        let mut claims_set = ClaimsSet::default();
+        claims_set.insert_i(12435, serde_cbor::Value::Text("stuff".into()));
+        claims_set.insert_t("testkey", serde_cbor::Value::Text("stuff".into()));
+
+        let cose_sign1 = CoseSign1::builder()
+            .protected(HeaderMap::default())
+            .unprotected(unprotected)
+            .payload(claims_set.serialize().expect("failed to serialize payload"))
+            .tagged()
+            .sign::<SigningKey, Signature>(&signer)
+            .unwrap();
+        let serialized =
+            serde_cbor::to_vec(&cose_sign1).expect("failed to serialize COSE_Sign1 to bytes");
+
+        let expected = Vec::<u8>::from_hex(COSE_SIGN1).unwrap();
+        assert_eq!(
+            expected, serialized,
+            "expected COSE_Sign1 and signed data do not match"
+        );
     }
 }
