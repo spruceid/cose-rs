@@ -4,6 +4,42 @@ use serde_cbor::Value;
 use std::collections::BTreeMap;
 use std::ops::Deref;
 
+pub enum IANAClaim {
+    Issuer(&'static str),
+    Subject(&'static str),
+    Audience(&'static str),
+    ExpirationTime(i128), // TODO EN: these should technically also allow for fractional time...
+    NotBefore(i128),
+    IssuedAt(i128),
+    CWTId(Vec<u8>),
+}
+
+impl IANAClaim {
+    pub fn key(&self) -> i128 {
+        match self {
+            IANAClaim::Issuer(_) => 1,
+            IANAClaim::Subject(_) => 2,
+            IANAClaim::Audience(_) => 3,
+            IANAClaim::ExpirationTime(_) => 4,
+            IANAClaim::NotBefore(_) => 5,
+            IANAClaim::IssuedAt(_) => 6,
+            IANAClaim::CWTId(_) => 7,
+        }
+    }
+
+    pub fn value(&self) -> Value {
+        match self {
+            IANAClaim::Issuer(value) => Value::Text(value.to_string()),
+            IANAClaim::Subject(value) => Value::Text(value.to_string()),
+            IANAClaim::Audience(value) => Value::Text(value.to_string()),
+            IANAClaim::ExpirationTime(value) => Value::Integer(*value), // TODO EN: these should technically also allow for fractional time...
+            IANAClaim::NotBefore(value) => Value::Integer(*value),
+            IANAClaim::IssuedAt(value) => Value::Integer(*value),
+            IANAClaim::CWTId(value) => Value::Bytes(value.to_vec()),
+        }
+    }
+}
+
 /// CWT claims set.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ClaimsSet(BTreeMap<Value, Value>);
@@ -11,8 +47,13 @@ pub struct ClaimsSet(BTreeMap<Value, Value>);
 impl ClaimsSet {
     /// Insert a claim with an integer label.
     pub fn insert_i<L: Into<i128>>(&mut self, label: L, value: Value) -> Option<Value> {
-        // TODO EN: add integer restrictions
-        self.0.insert(Value::Integer(label.into()), value)
+        let i: i128 = label.into();
+        // TODO EN: add number checks/restrictions
+        self.0.insert(Value::Integer(i), value)
+    }
+
+    pub fn insert_claim(&mut self, claim: IANAClaim) -> Option<Value> {
+        self.insert_i(claim.key(), claim.value())
     }
 
     /// Insert a claim with a text label.
@@ -91,22 +132,18 @@ mod test {
     fn serialize_payload() {
         // Example from RFC8392
         let mut claims_set = ClaimsSet::default();
-        claims_set.insert_i(1, serde_cbor::Value::Text("coap://as.example.com".into()));
-        claims_set.insert_i(2, serde_cbor::Value::Text("erikw".into()));
-        claims_set.insert_i(
-            3,
-            serde_cbor::Value::Text("coap://light.example.com".into()),
-        );
-        claims_set.insert_i(4, serde_cbor::Value::Integer(1444064944));
-        claims_set.insert_i(5, serde_cbor::Value::Integer(1443944944));
-        claims_set.insert_i(6, serde_cbor::Value::Integer(1443944944));
-        claims_set.insert_i(7, serde_cbor::Value::Bytes(hex::decode("0b71").unwrap()));
+        claims_set.insert_claim(IANAClaim::Issuer("coap://as.example.com"));
+        claims_set.insert_claim(IANAClaim::Subject("erikw"));
+        claims_set.insert_claim(IANAClaim::Audience("coap://light.example.com"));
+        claims_set.insert_claim(IANAClaim::ExpirationTime(1444064944));
+        claims_set.insert_claim(IANAClaim::NotBefore(1443944944));
+        claims_set.insert_claim(IANAClaim::IssuedAt(1443944944));
+        claims_set.insert_claim(IANAClaim::CWTId(hex::decode("0b71").unwrap()));
 
         let serialized = claims_set
             .serialize()
             .expect("failed to serialize claims set");
         let expected = hex::decode("a70175636f61703a2f2f61732e6578616d706c652e636f6d02656572696b77037818636f61703a2f2f6c696768742e6578616d706c652e636f6d041a5612aeb0051a5610d9f0061a5610d9f007420b71").unwrap();
-        // println!("serialized: {}", hex::encode(&serialized));
         assert_eq!(serialized, expected);
     }
 }
