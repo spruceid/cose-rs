@@ -409,9 +409,9 @@ fn signature_payload(
 
 #[cfg(test)]
 mod test {
-    use crate::claims_set::{self, ClaimsSet};
-
     use super::*;
+    use crate::claims_set::{ClaimsSet, IANAClaim};
+
     use hex::FromHex;
     use p256::{
         ecdsa::{Signature, SigningKey, VerifyingKey},
@@ -507,17 +507,33 @@ mod test {
 
     #[test]
     fn cwt_signing() {
-        let bytes = Vec::<u8>::from_hex(COSE_KEY).unwrap();
+        // Using key from RFC8392 example
+        let bytes = hex::decode("6c1382765aec5358f117733d281c1c7bdc39884d04a45a1e6c67c858bc206c19")
+            .unwrap();
         let signer: SigningKey = SecretKey::from_slice(&bytes).unwrap().into();
+
+        let mut protected = HeaderMap::default();
+        protected.insert_i(1, serde_cbor::Value::Integer(-7));
+
         let mut unprotected = HeaderMap::default();
-        unprotected.insert_i(4, serde_cbor::Value::Bytes("11".into()));
+        unprotected.insert_i(
+            4, // kid
+            serde_cbor::Value::Bytes(
+                hex::decode("4173796d6d65747269634543445341323536").expect("error decoding key id"),
+            ),
+        );
 
         let mut claims_set = ClaimsSet::default();
-        claims_set.insert_i(12435, serde_cbor::Value::Text("stuff".into()));
-        claims_set.insert_t("testkey", serde_cbor::Value::Text("stuff".into()));
+        claims_set.insert_claim(IANAClaim::Issuer("coap://as.example.com"));
+        claims_set.insert_claim(IANAClaim::Subject("erikw"));
+        claims_set.insert_claim(IANAClaim::Audience("coap://light.example.com"));
+        claims_set.insert_claim(IANAClaim::ExpirationTime(1444064944));
+        claims_set.insert_claim(IANAClaim::NotBefore(1443944944));
+        claims_set.insert_claim(IANAClaim::IssuedAt(1443944944));
+        claims_set.insert_claim(IANAClaim::CWTId(hex::decode("0b71").unwrap()));
 
         let cose_sign1 = CoseSign1::builder()
-            .protected(HeaderMap::default())
+            .protected(protected)
             .unprotected(unprotected)
             .payload(claims_set.serialize().expect("failed to serialize payload"))
             .tagged()
@@ -525,11 +541,11 @@ mod test {
             .unwrap();
         let serialized =
             serde_cbor::to_vec(&cose_sign1).expect("failed to serialize COSE_Sign1 to bytes");
-
-        let expected = Vec::<u8>::from_hex(COSE_SIGN1).unwrap();
+        let expected = hex::decode("d28443a10126a104524173796d6d657472696345434453413235365850a70175636f61703a2f2f61732e6578616d706c652e636f6d02656572696b77037818636f61703a2f2f6c696768742e6578616d706c652e636f6d041a5612aeb0051a5610d9f0061a5610d9f007420b7158405427c1ff28d23fbad1f29c4c7c6a555e601d6fa29f9179bc3d7438bacaca5acd08c8d4d4f96131680c429a01f85951ecee743a52b9b63632c57209120e1c9e30")
+            .unwrap();
         assert_eq!(
             expected, serialized,
-            "expected COSE_Sign1 and signed data do not match"
+            "expected COSE_Sign1 and signed CWT do not match"
         );
     }
 }
