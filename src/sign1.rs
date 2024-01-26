@@ -410,7 +410,7 @@ fn signature_payload(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::claims_set::{ClaimsSet, IANAClaim};
+    use crate::cwt::{ClaimsSet, IANAClaim};
 
     use hex::FromHex;
     use p256::{
