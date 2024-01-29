@@ -421,6 +421,9 @@ mod test {
     static COSE_SIGN1: &str = include_str!("../tests/sign1/serialized.cbor");
     static COSE_KEY: &str = include_str!("../tests/sign1/secret_key");
 
+    const RFC8392_KEY: &str = "6c1382765aec5358f117733d281c1c7bdc39884d04a45a1e6c67c858bc206c19";
+    const RFC8392_COSE_SIGN1: &str = "d28443a10126a104524173796d6d657472696345434453413235365850a70175636f61703a2f2f61732e6578616d706c652e636f6d02656572696b77037818636f61703a2f2f6c696768742e6578616d706c652e636f6d041a5612aeb0051a5610d9f0061a5610d9f007420b7158405427c1ff28d23fbad1f29c4c7c6a555e601d6fa29f9179bc3d7438bacaca5acd08c8d4d4f96131680c429a01f85951ecee743a52b9b63632c57209120e1c9e30";
+
     #[test]
     fn roundtrip() {
         let bytes = Vec::<u8>::from_hex(COSE_SIGN1).unwrap();
@@ -505,13 +508,7 @@ mod test {
             .expect("COSE_Sign1 could not be verified")
     }
 
-    #[test]
-    fn cwt_signing() {
-        // Using key from RFC8392 example
-        let bytes = hex::decode("6c1382765aec5358f117733d281c1c7bdc39884d04a45a1e6c67c858bc206c19")
-            .unwrap();
-        let signer: SigningKey = SecretKey::from_slice(&bytes).unwrap().into();
-
+    fn rfc8392_example_inputs() -> (HeaderMap, HeaderMap, ClaimsSet) {
         let mut protected = HeaderMap::default();
         protected.insert_i(1, serde_cbor::Value::Integer(-7));
 
@@ -531,7 +528,15 @@ mod test {
         claims_set.insert_claim(claim::NotBefore(NumericDate::Integer(1443944944)));
         claims_set.insert_claim(claim::IssuedAt(NumericDate::Integer(1443944944)));
         claims_set.insert_claim(claim::CWTId(hex::decode("0b71").unwrap()));
+        (protected, unprotected, claims_set)
+    }
 
+    #[test]
+    fn signing_cwt() {
+        // Using key from RFC8392 example
+        let bytes = hex::decode(RFC8392_KEY).unwrap();
+        let signer: SigningKey = SecretKey::from_slice(&bytes).unwrap().into();
+        let (protected, unprotected, claims_set) = rfc8392_example_inputs();
         let cose_sign1 = CoseSign1::builder()
             .protected(protected)
             .unprotected(unprotected)
@@ -541,11 +546,22 @@ mod test {
             .unwrap();
         let serialized =
             serde_cbor::to_vec(&cose_sign1).expect("failed to serialize COSE_Sign1 to bytes");
-        let expected = hex::decode("d28443a10126a104524173796d6d657472696345434453413235365850a70175636f61703a2f2f61732e6578616d706c652e636f6d02656572696b77037818636f61703a2f2f6c696768742e6578616d706c652e636f6d041a5612aeb0051a5610d9f0061a5610d9f007420b7158405427c1ff28d23fbad1f29c4c7c6a555e601d6fa29f9179bc3d7438bacaca5acd08c8d4d4f96131680c429a01f85951ecee743a52b9b63632c57209120e1c9e30")
-            .unwrap();
+        let expected = hex::decode(RFC8392_COSE_SIGN1).unwrap();
         assert_eq!(
             expected, serialized,
             "expected COSE_Sign1 and signed CWT do not match"
         );
+    }
+
+    #[test]
+    fn deserializing_signed_cwt() {
+        let cose_sign1_bytes = hex::decode(RFC8392_COSE_SIGN1).unwrap();
+        let cose_sign1: CoseSign1 = serde_cbor::from_slice(&cose_sign1_bytes)
+            .expect("failed to parse COSE_Sign1 from bytes");
+        let parsed_claims_set: ClaimsSet =
+            serde_cbor::from_slice(cose_sign1.payload().expect("failed to retrieve payload"))
+                .expect("failed to parse claims set from payload");
+        let (_, _, expected_claims_set) = rfc8392_example_inputs();
+        assert_eq!(parsed_claims_set, expected_claims_set);
     }
 }
