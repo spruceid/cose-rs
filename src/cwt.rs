@@ -3,7 +3,7 @@ use serde_cbor::Value;
 use std::collections::BTreeMap;
 use std::ops::Deref;
 
-pub use crate::claim::{self, Claim, Key, NumericDate};
+pub use crate::claim::{self, Claim, Label, NumericDate};
 
 /// CWT claims set.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -11,11 +11,11 @@ pub struct ClaimsSet(BTreeMap<Value, Value>);
 
 impl ClaimsSet {
     pub fn insert_claim<T: Claim>(&mut self, claim: T) -> Option<Value> {
-        self.0.insert(T::key().into(), claim.into())
+        self.0.insert(T::label().into(), claim.into())
     }
 
     pub fn get_claim<T: Claim>(&self) -> Option<&Value> {
-        self.0.get(&T::key().into())
+        self.0.get(&T::label().into())
     }
 
     pub fn serialize(&self) -> Result<Vec<u8>, serde_cbor::Error> {
@@ -72,20 +72,20 @@ mod test {
         claims_set2.insert_claim(claim::Audience::new("coap://light.example.com".into()));
         claims_set2.insert_claim(claim::Issuer::new("coap://as.example.com".into()));
 
-        // Create some dummy claims using negative/text keys
+        // Create some dummy claims using negative/text labels
         define_claim!(
-            TestStringKey,
+            TestStringLabel,
             serde_cbor::Value,
-            Key::Text("testkey".into())
+            Label::Text("testlabel".into())
         );
-        define_claim!(TestNegIntKey, serde_cbor::Value, Key::Integer(-1000000));
+        define_claim!(TestNegIntLabel, serde_cbor::Value, Label::Integer(-1000000));
 
         let serialized3 =
-            hex::decode("a23a000f423ffbc059161e4f765fd967746573746b6579393038").unwrap();
+            hex::decode("a23a000f423ffbc059161e4f765fd969746573746c6162656c393038").unwrap();
 
         let mut claims_set3 = ClaimsSet::default();
-        claims_set3.insert_claim(TestStringKey(Value::Integer(-12345)));
-        claims_set3.insert_claim(TestNegIntKey(Value::Float(-100.3456)));
+        claims_set3.insert_claim(TestStringLabel(Value::Integer(-12345)));
+        claims_set3.insert_claim(TestNegIntLabel(Value::Float(-100.3456)));
 
         vec![
             ("empty", ClaimsSet::default(), hex::decode("a0").unwrap()),

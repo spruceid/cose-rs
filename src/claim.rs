@@ -4,18 +4,18 @@ use serde_cbor::Value;
 /// Registered CWT claims from the
 /// [CWT Claims registry](https://www.iana.org/assignments/cwt/cwt.xhtml).
 pub trait Claim: Into<Value> {
-    fn key() -> Key;
+    fn label() -> Label;
 }
 
-pub enum Key {
+pub enum Label {
     Text(String),
     Integer(i128),
 }
-impl From<Key> for Value {
-    fn from(key: Key) -> Value {
-        match key {
-            Key::Text(k) => Value::Text(k),
-            Key::Integer(k) => Value::Integer(k),
+impl From<Label> for Value {
+    fn from(label: Label) -> Value {
+        match label {
+            Label::Text(k) => Value::Text(k),
+            Label::Integer(k) => Value::Integer(k),
         }
     }
 }
@@ -39,7 +39,7 @@ impl From<NumericDate> for Value {
 /// Custom value_type's must implement From<value_type> for serde_cbor::Value.
 #[macro_export]
 macro_rules! define_claim {
-    ($name:ident, $value_type: ty, $key: expr) => {
+    ($name:ident, $value_type: ty, $label: expr) => {
         #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
         pub struct $name($value_type);
         impl $name {
@@ -49,8 +49,8 @@ macro_rules! define_claim {
         }
 
         impl Claim for $name {
-            fn key() -> Key {
-                $key
+            fn label() -> Label {
+                $label
             }
         }
 
@@ -62,10 +62,10 @@ macro_rules! define_claim {
     };
 }
 
-define_claim!(Issuer, String, Key::Integer(1));
-define_claim!(Subject, String, Key::Integer(2));
-define_claim!(Audience, String, Key::Integer(3));
-define_claim!(ExpirationTime, NumericDate, Key::Integer(4));
-define_claim!(NotBefore, NumericDate, Key::Integer(5));
-define_claim!(IssuedAt, NumericDate, Key::Integer(6));
-define_claim!(CWTId, Vec<u8>, Key::Integer(7));
+define_claim!(Issuer, String, Label::Integer(1));
+define_claim!(Subject, String, Label::Integer(2));
+define_claim!(Audience, String, Label::Integer(3));
+define_claim!(ExpirationTime, NumericDate, Label::Integer(4));
+define_claim!(NotBefore, NumericDate, Label::Integer(5));
+define_claim!(IssuedAt, NumericDate, Label::Integer(6));
+define_claim!(CWTId, Vec<u8>, Label::Integer(7));
