@@ -410,7 +410,7 @@ fn signature_payload(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::cwt::{claim, ClaimsSet};
+    use crate::cwt::{claim, ClaimsSet, NumericDate};
 
     use hex::FromHex;
     use p256::{
@@ -527,9 +527,9 @@ mod test {
         claims_set.insert_claim(claim::Issuer("coap://as.example.com".into()));
         claims_set.insert_claim(claim::Subject("erikw".into()));
         claims_set.insert_claim(claim::Audience("coap://light.example.com".into()));
-        claims_set.insert_claim(claim::ExpirationTime(1444064944));
-        claims_set.insert_claim(claim::NotBefore(1443944944));
-        claims_set.insert_claim(claim::IssuedAt(1443944944));
+        claims_set.insert_claim(claim::ExpirationTime(NumericDate::Integer(1444064944)));
+        claims_set.insert_claim(claim::NotBefore(NumericDate::Integer(1443944944)));
+        claims_set.insert_claim(claim::IssuedAt(NumericDate::Integer(1443944944)));
         claims_set.insert_claim(claim::CWTId(hex::decode("0b71").unwrap()));
 
         let cose_sign1 = CoseSign1::builder()

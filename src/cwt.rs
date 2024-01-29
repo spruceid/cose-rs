@@ -3,7 +3,7 @@ use serde_cbor::Value;
 use std::collections::BTreeMap;
 use std::ops::Deref;
 
-pub use crate::claim::{self, Claim, Key};
+pub use crate::claim::{self, Claim, Key, NumericDate};
 
 /// CWT claims set.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -54,9 +54,9 @@ mod test {
         claims_set.insert_claim(claim::Issuer("coap://as.example.com".into()));
         claims_set.insert_claim(claim::Subject("erikw".into()));
         claims_set.insert_claim(claim::Audience("coap://light.example.com".into()));
-        claims_set.insert_claim(claim::ExpirationTime(1444064944));
-        claims_set.insert_claim(claim::NotBefore(1443944944));
-        claims_set.insert_claim(claim::IssuedAt(1443944944));
+        claims_set.insert_claim(claim::ExpirationTime(NumericDate::Integer(1444064944)));
+        claims_set.insert_claim(claim::NotBefore(NumericDate::Integer(1443944944)));
+        claims_set.insert_claim(claim::IssuedAt(NumericDate::Integer(1443944944)));
         claims_set.insert_claim(claim::CWTId(hex::decode("0b71").unwrap()));
 
         let serialized = claims_set

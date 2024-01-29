@@ -20,6 +20,20 @@ impl From<Key> for Value {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub enum NumericDate {
+    Integer(i128),
+    Fractional(f64),
+}
+impl From<NumericDate> for Value {
+    fn from(value: NumericDate) -> Self {
+        match value {
+            NumericDate::Integer(i) => Value::Integer(i),
+            NumericDate::Fractional(f) => Value::Float(f),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Issuer(pub String);
 impl Claim for Issuer {
@@ -59,9 +73,8 @@ impl From<Audience> for Value {
     }
 }
 
-// TODO EN: support float date strings
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
-pub struct ExpirationTime(pub i128);
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct ExpirationTime(pub NumericDate);
 impl Claim for ExpirationTime {
     fn key() -> Key {
         Key::Integer(4)
@@ -69,12 +82,12 @@ impl Claim for ExpirationTime {
 }
 impl From<ExpirationTime> for Value {
     fn from(value: ExpirationTime) -> Self {
-        Value::Integer(value.0)
+        value.0.into()
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
-pub struct NotBefore(pub i128);
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct NotBefore(pub NumericDate);
 impl Claim for NotBefore {
     fn key() -> Key {
         Key::Integer(5)
@@ -82,12 +95,12 @@ impl Claim for NotBefore {
 }
 impl From<NotBefore> for Value {
     fn from(value: NotBefore) -> Self {
-        Value::Integer(value.0)
+        value.0.into()
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
-pub struct IssuedAt(pub i128);
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct IssuedAt(pub NumericDate);
 impl Claim for IssuedAt {
     fn key() -> Key {
         Key::Integer(6)
@@ -95,7 +108,7 @@ impl Claim for IssuedAt {
 }
 impl From<IssuedAt> for Value {
     fn from(value: IssuedAt) -> Self {
-        Value::Integer(value.0)
+        value.0.into()
     }
 }
 
