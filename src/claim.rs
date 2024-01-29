@@ -34,93 +34,37 @@ impl From<NumericDate> for Value {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
-pub struct Issuer(pub String);
-impl Claim for Issuer {
-    fn key() -> Key {
-        Key::Integer(1)
-    }
-}
-impl From<Issuer> for Value {
-    fn from(value: Issuer) -> Self {
-        value.0.into()
-    }
+/// Simple macro for defining generic claims with implementations of
+/// the Claim and From<> for serde_cbor::Value traits.
+/// Custom value_type's must implement From<value_type> for serde_cbor::Value.
+macro_rules! define_claim {
+    ($name:ident, $value_type: ty, $key: expr) => {
+        #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+        pub struct $name($value_type);
+        impl $name {
+            pub fn new(value: $value_type) -> $name {
+                $name(value)
+            }
+        }
+
+        impl Claim for $name {
+            fn key() -> Key {
+                $key
+            }
+        }
+
+        impl From<$name> for Value {
+            fn from(value: $name) -> Self {
+                value.0.into()
+            }
+        }
+    };
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
-pub struct Subject(pub String);
-impl Claim for Subject {
-    fn key() -> Key {
-        Key::Integer(2)
-    }
-}
-impl From<Subject> for Value {
-    fn from(value: Subject) -> Self {
-        value.0.into()
-    }
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
-pub struct Audience(pub String);
-impl Claim for Audience {
-    fn key() -> Key {
-        Key::Integer(3)
-    }
-}
-impl From<Audience> for Value {
-    fn from(value: Audience) -> Self {
-        value.0.into()
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-pub struct ExpirationTime(pub NumericDate);
-impl Claim for ExpirationTime {
-    fn key() -> Key {
-        Key::Integer(4)
-    }
-}
-impl From<ExpirationTime> for Value {
-    fn from(value: ExpirationTime) -> Self {
-        value.0.into()
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-pub struct NotBefore(pub NumericDate);
-impl Claim for NotBefore {
-    fn key() -> Key {
-        Key::Integer(5)
-    }
-}
-impl From<NotBefore> for Value {
-    fn from(value: NotBefore) -> Self {
-        value.0.into()
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-pub struct IssuedAt(pub NumericDate);
-impl Claim for IssuedAt {
-    fn key() -> Key {
-        Key::Integer(6)
-    }
-}
-impl From<IssuedAt> for Value {
-    fn from(value: IssuedAt) -> Self {
-        value.0.into()
-    }
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
-pub struct CWTId(pub Vec<u8>);
-impl Claim for CWTId {
-    fn key() -> Key {
-        Key::Integer(7)
-    }
-}
-impl From<CWTId> for Value {
-    fn from(value: CWTId) -> Self {
-        value.0.into()
-    }
-}
+define_claim!(Issuer, String, Key::Integer(1));
+define_claim!(Subject, String, Key::Integer(2));
+define_claim!(Audience, String, Key::Integer(3));
+define_claim!(ExpirationTime, NumericDate, Key::Integer(4));
+define_claim!(NotBefore, NumericDate, Key::Integer(5));
+define_claim!(IssuedAt, NumericDate, Key::Integer(6));
+define_claim!(CWTId, Vec<u8>, Key::Integer(7));
