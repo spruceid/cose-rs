@@ -410,7 +410,7 @@ fn signature_payload(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::cwt::{Claim, ClaimsSet};
+    use crate::cwt::{claim, ClaimsSet};
 
     use hex::FromHex;
     use p256::{
@@ -524,13 +524,13 @@ mod test {
         );
 
         let mut claims_set = ClaimsSet::default();
-        claims_set.insert_claim(Claim::Issuer("coap://as.example.com"));
-        claims_set.insert_claim(Claim::Subject("erikw"));
-        claims_set.insert_claim(Claim::Audience("coap://light.example.com"));
-        claims_set.insert_claim(Claim::ExpirationTime(1444064944));
-        claims_set.insert_claim(Claim::NotBefore(1443944944));
-        claims_set.insert_claim(Claim::IssuedAt(1443944944));
-        claims_set.insert_claim(Claim::CWTId(hex::decode("0b71").unwrap()));
+        claims_set.insert_claim(claim::Issuer("coap://as.example.com".into()));
+        claims_set.insert_claim(claim::Subject("erikw".into()));
+        claims_set.insert_claim(claim::Audience("coap://light.example.com".into()));
+        claims_set.insert_claim(claim::ExpirationTime(1444064944));
+        claims_set.insert_claim(claim::NotBefore(1443944944));
+        claims_set.insert_claim(claim::IssuedAt(1443944944));
+        claims_set.insert_claim(claim::CWTId(hex::decode("0b71").unwrap()));
 
         let cose_sign1 = CoseSign1::builder()
             .protected(protected)

@@ -1,40 +1,21 @@
-// TODO EN: consider whether to name this claims_set or cwt?
 use serde::{Deserialize, Serialize};
 use serde_cbor::Value;
 use std::collections::BTreeMap;
 use std::ops::Deref;
 
-pub use crate::claim::Claim;
+pub use crate::claim::{self, Claim, Key};
 
 /// CWT claims set.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ClaimsSet(BTreeMap<Value, Value>);
 
 impl ClaimsSet {
-    /// Insert a claim with an integer label.
-    pub fn insert_i<L: Into<i128>>(&mut self, label: L, value: Value) -> Option<Value> {
-        let i: i128 = label.into();
-        // TODO EN: potentially add restrictions based on registered claims
-        self.0.insert(Value::Integer(i), value)
+    pub fn insert_claim<T: Claim>(&mut self, claim: T) -> Option<Value> {
+        self.0.insert(T::key().into(), claim.into())
     }
 
-    pub fn insert_claim(&mut self, claim: Claim) -> Option<Value> {
-        self.insert_i(claim.key(), claim.value())
-    }
-
-    /// Insert a claim with a text label.
-    pub fn insert_t<L: Into<String>>(&mut self, label: L, value: Value) -> Option<Value> {
-        self.0.insert(Value::Text(label.into()), value)
-    }
-
-    /// Retrieve a claim value with an integer label.
-    pub fn get_i<L: Into<i128>>(&self, label: L) -> Option<&Value> {
-        self.0.get(&Value::Integer(label.into()))
-    }
-
-    /// Retrieve a claim value with a text label.
-    pub fn get_t<L: Into<String>>(&self, label: L) -> Option<&Value> {
-        self.0.get(&Value::Text(label.into()))
+    pub fn get_claim<T: Claim>(&self) -> Option<&Value> {
+        self.0.get(&T::key().into())
     }
 
     pub fn serialize(&self) -> Result<Vec<u8>, serde_cbor::Error> {
@@ -70,13 +51,13 @@ mod test {
     fn serialize_payload() {
         // Example from RFC8392
         let mut claims_set = ClaimsSet::default();
-        claims_set.insert_claim(Claim::Issuer("coap://as.example.com"));
-        claims_set.insert_claim(Claim::Subject("erikw"));
-        claims_set.insert_claim(Claim::Audience("coap://light.example.com"));
-        claims_set.insert_claim(Claim::ExpirationTime(1444064944));
-        claims_set.insert_claim(Claim::NotBefore(1443944944));
-        claims_set.insert_claim(Claim::IssuedAt(1443944944));
-        claims_set.insert_claim(Claim::CWTId(hex::decode("0b71").unwrap()));
+        claims_set.insert_claim(claim::Issuer("coap://as.example.com".into()));
+        claims_set.insert_claim(claim::Subject("erikw".into()));
+        claims_set.insert_claim(claim::Audience("coap://light.example.com".into()));
+        claims_set.insert_claim(claim::ExpirationTime(1444064944));
+        claims_set.insert_claim(claim::NotBefore(1443944944));
+        claims_set.insert_claim(claim::IssuedAt(1443944944));
+        claims_set.insert_claim(claim::CWTId(hex::decode("0b71").unwrap()));
 
         let serialized = claims_set
             .serialize()
