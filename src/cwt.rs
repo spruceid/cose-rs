@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_cbor::Value;
 use std::collections::BTreeMap;
-use std::ops::Deref;
 
 pub use crate::claim::{self, Claim, Label, NumericDate};
 
@@ -20,26 +19,6 @@ impl ClaimsSet {
 
     pub fn serialize(&self) -> Result<Vec<u8>, Error> {
         serde_cbor::to_vec(&self).map_err(Error::UnableToSerializeClaimsSet)
-    }
-}
-
-impl AsRef<BTreeMap<Value, Value>> for ClaimsSet {
-    fn as_ref(&self) -> &BTreeMap<Value, Value> {
-        &self.0
-    }
-}
-
-impl Deref for ClaimsSet {
-    type Target = BTreeMap<Value, Value>;
-
-    fn deref(&self) -> &BTreeMap<Value, Value> {
-        &self.0
-    }
-}
-
-impl From<BTreeMap<Value, Value>> for ClaimsSet {
-    fn from(m: BTreeMap<Value, Value>) -> Self {
-        Self(m)
     }
 }
 
