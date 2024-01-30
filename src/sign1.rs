@@ -543,7 +543,7 @@ mod test {
             .payload(claims_set.serialize().expect("failed to serialize payload"))
             .tagged()
             .sign::<SigningKey, Signature>(&signer)
-            .unwrap();
+            .expect("failed to sign CWT");
         let serialized =
             serde_cbor::to_vec(&cose_sign1).expect("failed to serialize COSE_Sign1 to bytes");
         let expected = hex::decode(RFC8392_COSE_SIGN1).unwrap();
