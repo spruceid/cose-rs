@@ -18,8 +18,8 @@ impl ClaimsSet {
         self.0.get(&T::label().into())
     }
 
-    pub fn serialize(&self) -> Result<Vec<u8>, serde_cbor::Error> {
-        serde_cbor::to_vec(&self)
+    pub fn serialize(&self) -> Result<Vec<u8>, Error> {
+        serde_cbor::to_vec(&self).map_err(Error::UnableToSerializeClaimsSet)
     }
 }
 
@@ -41,6 +41,13 @@ impl From<BTreeMap<Value, Value>> for ClaimsSet {
     fn from(m: BTreeMap<Value, Value>) -> Self {
         Self(m)
     }
+}
+
+/// Errors that can occur working with a ClaimsSet.
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("unable to serialize CWT ClaimsSet: {0}")]
+    UnableToSerializeClaimsSet(serde_cbor::Error),
 }
 
 #[cfg(test)]
