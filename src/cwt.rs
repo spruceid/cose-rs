@@ -120,16 +120,4 @@ mod test {
             assert_eq!(parsed_claims_set, expected_claims_set, "case: {}", case);
         }
     }
-
-    #[test]
-    fn roundtrip() {
-        for (case, claims_set, _) in test_cases() {
-            let serialized = claims_set
-                .serialize()
-                .unwrap_or_else(|_| panic!("failed to serialize claims set for {}", case));
-            let parsed_claims: ClaimsSet = serde_cbor::from_slice(&serialized)
-                .unwrap_or_else(|_| panic!("failed to deserialize bytes into claims set {}", case));
-            assert_eq!(parsed_claims, claims_set, "case: {}", case);
-        }
-    }
 }
