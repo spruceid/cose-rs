@@ -1,4 +1,5 @@
 use crate::algorithm::{Algorithm, SignatureAlgorithm};
+use crate::cwt::{self, ClaimsSet};
 pub use crate::{header_map::HeaderMap, protected::Protected};
 use serde::{
     de::{self, Error as DeError},
@@ -71,6 +72,8 @@ pub enum Error {
     UnableToSerializeProtected(serde_cbor::Error),
     #[error("unable to serialize COSE_Sign1 signature payload: {0}")]
     UnableToSerializeSignaturePayload(serde_cbor::Error),
+    #[error("unable to set ClaimsSet: {0}")]
+    UnableToDeserializeIntoClaimsSet(serde_cbor::Error),
 }
 
 /// Result with error type: [`Error`].
@@ -173,6 +176,17 @@ impl CoseSign1 {
     pub fn payload(&self) -> Option<&ByteBuf> {
         self.inner.2.as_ref()
     }
+
+    pub fn claims_set(&self) -> Result<Option<ClaimsSet>> {
+        match self.payload() {
+            None => Ok(None),
+            Some(payload) => {
+                let claims_set: ClaimsSet = serde_cbor::from_slice(payload)
+                    .map_err(Error::UnableToDeserializeIntoClaimsSet)?;
+                Ok(Some(claims_set))
+            }
+        }
+    }
 }
 
 impl ser::Serialize for CoseSign1 {
@@ -262,6 +276,11 @@ impl Builder {
     {
         self.payload = Some(ByteBuf::from(p));
         self
+    }
+
+    pub fn claims_set(self, claims_set: ClaimsSet) -> Result<Self, cwt::Error> {
+        let serialized_claims = claims_set.serialize()?;
+        Ok(self.payload(serialized_claims))
     }
 
     /// Set the signature algorithm in the protected headers.
@@ -410,7 +429,7 @@ fn signature_payload(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::cwt::{claim, ClaimsSet, NumericDate};
+    use crate::cwt::{claim, NumericDate};
 
     use hex::FromHex;
     use p256::{
@@ -546,7 +565,8 @@ mod test {
         let cose_sign1 = CoseSign1::builder()
             .protected(protected)
             .unprotected(unprotected)
-            .payload(claims_set.serialize().expect("failed to serialize payload"))
+            .claims_set(claims_set)
+            .expect("failed to set claims set")
             .tagged()
             .sign::<SigningKey, Signature>(&signer)
             .expect("failed to sign CWT");
@@ -564,9 +584,10 @@ mod test {
         let cose_sign1_bytes = hex::decode(RFC8392_COSE_SIGN1).unwrap();
         let cose_sign1: CoseSign1 = serde_cbor::from_slice(&cose_sign1_bytes)
             .expect("failed to parse COSE_Sign1 from bytes");
-        let parsed_claims_set: ClaimsSet =
-            serde_cbor::from_slice(cose_sign1.payload().expect("failed to retrieve payload"))
-                .expect("failed to parse claims set from payload");
+        let parsed_claims_set = cose_sign1
+            .claims_set()
+            .expect("failed to parse claims set from payload")
+            .expect("retrieved empty claims set");
         let (_, _, expected_claims_set) = rfc8392_example_inputs();
         assert_eq!(parsed_claims_set, expected_claims_set);
     }
