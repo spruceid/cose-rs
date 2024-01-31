@@ -54,8 +54,6 @@ pub enum Error {
 
 #[cfg(test)]
 mod test {
-    use crate::define_claim;
-
     use super::*;
 
     fn test_cases() -> Vec<(&'static str, ClaimsSet, Vec<u8>)> {
@@ -89,20 +87,12 @@ mod test {
         claims_set2.insert_claim(claim::Audience::new("coap://light.example.com".into()));
         claims_set2.insert_claim(claim::Issuer::new("coap://as.example.com".into()));
 
-        // Create some dummy claims using negative/text keys
-        define_claim!(
-            TestStringKey,
-            serde_cbor::Value,
-            Key::Text("testkey".into())
-        );
-        define_claim!(TestNegIntKey, serde_cbor::Value, Key::Integer(-1000000));
-
         let serialized3 =
             hex::decode("a23a000f423ffbc059161e4f765fd967746573746b6579393038").unwrap();
 
         let mut claims_set3 = ClaimsSet::default();
-        claims_set3.insert_claim(TestStringKey(Value::Integer(-12345)));
-        claims_set3.insert_claim(TestNegIntKey(Value::Float(-100.3456)));
+        claims_set3.insert_t("testkey", Value::Integer(-12345));
+        claims_set3.insert_i(-1000000, Value::Float(-100.3456));
 
         vec![
             ("empty", ClaimsSet::default(), hex::decode("a0").unwrap()),
