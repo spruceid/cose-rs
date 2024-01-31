@@ -13,8 +13,29 @@ impl ClaimsSet {
         self.0.insert(T::key().into(), claim.into())
     }
 
+    /// Insert a claim with an integer key.
+    pub fn insert_i<T: Into<i128>>(&mut self, key: T, value: Value) -> Option<Value> {
+        self.0.insert(Value::Integer(key.into()), value)
+    }
+
+    /// Insert a claim with a text key.
+    pub fn insert_t<T: Into<String>>(&mut self, key: T, value: Value) -> Option<Value> {
+        self.0.insert(Value::Text(key.into()), value)
+    }
+
+    /// Retrieve a defined CWT claim struct.
     pub fn get_claim<T: Claim>(&self) -> Option<&Value> {
         self.0.get(&T::key().into())
+    }
+
+    /// Retrieve a claim value with an integer key.
+    pub fn get_i<T: Into<i128>>(&self, key: T) -> Option<&Value> {
+        self.0.get(&Value::Integer(key.into()))
+    }
+
+    /// Retrieve a claim value with a text key.
+    pub fn get_t<T: Into<String>>(&self, key: T) -> Option<&Value> {
+        self.0.get(&Value::Text(key.into()))
     }
 
     /// Serialize the ClaimsSet to CBOR bytes, so that it
