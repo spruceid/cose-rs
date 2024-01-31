@@ -4,11 +4,13 @@ use std::collections::BTreeMap;
 
 pub use crate::claim::{self, Claim, Key, NumericDate};
 
-/// CWT claims set.
+/// Representation of a CWT claims set (a CBOR map containing CWT claims),
+/// as defined in [RFC8392](https://datatracker.ietf.org/doc/html/rfc8392).
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ClaimsSet(BTreeMap<Value, Value>);
 
 impl ClaimsSet {
+    /// Insert a defined CWT claim struct.
     pub fn insert_claim<T: Claim>(&mut self, claim: T) -> Option<Value> {
         self.0.insert(T::key().into(), claim.into())
     }

@@ -1,12 +1,15 @@
 use serde::{Deserialize, Serialize};
 use serde_cbor::Value;
 
-/// Registered CWT claims from the
-/// [CWT Claims registry](https://www.iana.org/assignments/cwt/cwt.xhtml).
+/// Representation of CWT claims, as defined in
+/// [RFC8392](https://datatracker.ietf.org/doc/html/rfc8392).
 pub trait Claim: Into<Value> {
     fn key() -> Key;
 }
 
+/// Representation of the CBOR map key used to identify a claim
+/// within a CWT claims set, and restricted to text and integer values,
+/// per [RFC8392](https://datatracker.ietf.org/doc/html/rfc8392).
 pub enum Key {
     Text(String),
     Integer(i128),
