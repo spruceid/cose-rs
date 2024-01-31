@@ -17,6 +17,8 @@ impl ClaimsSet {
         self.0.get(&T::label().into())
     }
 
+    /// Serialize the ClaimsSet to CBOR bytes, so that it 
+    /// can be attached as a payload to a COSE object.
     pub fn serialize(&self) -> Result<Vec<u8>, Error> {
         serde_cbor::to_vec(&self).map_err(Error::UnableToSerializeClaimsSet)
     }

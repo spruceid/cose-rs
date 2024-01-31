@@ -20,6 +20,9 @@ impl From<Label> for Value {
     }
 }
 
+/// Numerical representation of seconds relative to the Unix Epoch,
+/// as defined in [RFC7049](https://www.rfc-editor.org/rfc/rfc7049#section-2.4.1)
+/// with the leading tag 1 omitted.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum NumericDate {
     Integer(i128),
