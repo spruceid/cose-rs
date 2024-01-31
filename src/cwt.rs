@@ -40,6 +40,21 @@ impl ClaimsSet {
         self.0.get(&Value::Text(key.into()))
     }
 
+    /// Remove a defined CWT claim struct from ClaimsSet.
+    pub fn remove_claim<T: Claim>(&mut self) -> Option<Value> {
+        self.0.remove(&T::key().into())
+    }
+
+    /// Remove a claim value with an integer key from ClaimsSet.
+    pub fn remove_i<T: Into<i128>>(&mut self, key: T) -> Option<Value> {
+        self.0.remove(&Value::Integer(key.into()))
+    }
+
+    /// Remove a claim value with a text key from ClaimsSet.
+    pub fn remove_t<T: Into<String>>(&mut self, key: T) -> Option<Value> {
+        self.0.remove(&Value::Text(key.into()))
+    }
+
     /// Serialize the ClaimsSet to CBOR bytes, so that it
     /// can be attached as a payload to a COSE object.
     pub fn serialize(&self) -> Result<Vec<u8>, Error> {
@@ -96,11 +111,19 @@ mod test {
         claims_set3.insert_t("testkey", Value::Integer(-12345));
         claims_set3.insert_i(-1000000, Value::Float(-100.3456));
 
+        // Add and remove keys to ensure this doesn't change serialization
+        let mut claims_set4 = claims_set1.clone();
+        claims_set4.insert_t("testkey", Value::Integer(-12345));
+        claims_set4.insert_i(-1000000, Value::Float(-100.3456));
+        claims_set4.remove_t("testkey");
+        claims_set4.remove_i(-1000000);
+
         vec![
             ("empty", ClaimsSet::default(), hex::decode("a0").unwrap()),
             ("normal", claims_set1, serialized1.clone()),
-            ("reordered", claims_set2, serialized1),
+            ("reordered", claims_set2, serialized1.clone()),
             ("custom", claims_set3, serialized3),
+            ("with_remove", claims_set4, serialized1),
         ]
     }
 
