@@ -524,9 +524,15 @@ mod test {
         claims_set.insert_claim(claim::Issuer::new("coap://as.example.com".into()));
         claims_set.insert_claim(claim::Subject::new("erikw".into()));
         claims_set.insert_claim(claim::Audience::new("coap://light.example.com".into()));
-        claims_set.insert_claim(claim::ExpirationTime::new(NumericDate::Integer(1444064944)));
-        claims_set.insert_claim(claim::NotBefore::new(NumericDate::Integer(1443944944)));
-        claims_set.insert_claim(claim::IssuedAt::new(NumericDate::Integer(1443944944)));
+        claims_set.insert_claim(claim::ExpirationTime::new(NumericDate::IntegerSeconds(
+            1444064944,
+        )));
+        claims_set.insert_claim(claim::NotBefore::new(NumericDate::IntegerSeconds(
+            1443944944,
+        )));
+        claims_set.insert_claim(claim::IssuedAt::new(NumericDate::IntegerSeconds(
+            1443944944,
+        )));
         claims_set.insert_claim(claim::CWTId::new(hex::decode("0b71").unwrap()));
         (protected, unprotected, claims_set)
     }

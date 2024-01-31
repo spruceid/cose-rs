@@ -25,14 +25,14 @@ impl From<Label> for Value {
 /// with the leading tag 1 omitted.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum NumericDate {
-    Integer(i128),
-    Fractional(f64),
+    IntegerSeconds(i128),
+    FractionalSeconds(f64),
 }
 impl From<NumericDate> for Value {
     fn from(value: NumericDate) -> Self {
         match value {
-            NumericDate::Integer(i) => Value::Integer(i),
-            NumericDate::Fractional(f) => Value::Float(f),
+            NumericDate::IntegerSeconds(i) => Value::Integer(i),
+            NumericDate::FractionalSeconds(f) => Value::Float(f),
         }
     }
 }

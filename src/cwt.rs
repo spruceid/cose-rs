@@ -17,7 +17,7 @@ impl ClaimsSet {
         self.0.get(&T::label().into())
     }
 
-    /// Serialize the ClaimsSet to CBOR bytes, so that it 
+    /// Serialize the ClaimsSet to CBOR bytes, so that it
     /// can be attached as a payload to a COSE object.
     pub fn serialize(&self) -> Result<Vec<u8>, Error> {
         serde_cbor::to_vec(&self).map_err(Error::UnableToSerializeClaimsSet)
@@ -45,18 +45,26 @@ mod test {
         claims_set1.insert_claim(claim::Issuer::new("coap://as.example.com".into()));
         claims_set1.insert_claim(claim::Subject::new("erikw".into()));
         claims_set1.insert_claim(claim::Audience::new("coap://light.example.com".into()));
-        claims_set1.insert_claim(claim::ExpirationTime::new(NumericDate::Integer(1444064944)));
-        claims_set1.insert_claim(claim::NotBefore::new(NumericDate::Fractional(1443944944.5)));
-        claims_set1.insert_claim(claim::IssuedAt::new(NumericDate::Integer(0)));
+        claims_set1.insert_claim(claim::ExpirationTime::new(NumericDate::IntegerSeconds(
+            1444064944,
+        )));
+        claims_set1.insert_claim(claim::NotBefore::new(NumericDate::FractionalSeconds(
+            1443944944.5,
+        )));
+        claims_set1.insert_claim(claim::IssuedAt::new(NumericDate::IntegerSeconds(0)));
         claims_set1.insert_claim(claim::CWTId::new(hex::decode("0b71").unwrap()));
 
         // Reordered case above
         let mut claims_set2 = ClaimsSet::default();
-        claims_set2.insert_claim(claim::IssuedAt::new(NumericDate::Integer(0)));
+        claims_set2.insert_claim(claim::IssuedAt::new(NumericDate::IntegerSeconds(0)));
         claims_set2.insert_claim(claim::Subject::new("erikw".into()));
-        claims_set2.insert_claim(claim::NotBefore::new(NumericDate::Fractional(1443944944.5)));
+        claims_set2.insert_claim(claim::NotBefore::new(NumericDate::FractionalSeconds(
+            1443944944.5,
+        )));
         claims_set2.insert_claim(claim::CWTId::new(hex::decode("0b71").unwrap()));
-        claims_set2.insert_claim(claim::ExpirationTime::new(NumericDate::Integer(1444064944)));
+        claims_set2.insert_claim(claim::ExpirationTime::new(NumericDate::IntegerSeconds(
+            1444064944,
+        )));
         claims_set2.insert_claim(claim::Audience::new("coap://light.example.com".into()));
         claims_set2.insert_claim(claim::Issuer::new("coap://as.example.com".into()));
 
