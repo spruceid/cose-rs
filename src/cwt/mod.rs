@@ -1,8 +1,10 @@
+pub mod claim;
+
 use serde::{Deserialize, Serialize};
 use serde_cbor::Value;
 use std::collections::BTreeMap;
 
-pub use crate::claim::{self, Claim, Key, NumericDate};
+pub use crate::cwt::claim::{Claim, Key, NumericDate};
 
 /// Representation of a CWT claims set (a CBOR map containing CWT claims),
 /// as defined in [RFC8392](https://datatracker.ietf.org/doc/html/rfc8392).
