@@ -13,8 +13,15 @@ pub struct ClaimsSet(BTreeMap<Value, Value>);
 
 impl ClaimsSet {
     /// Insert a defined CWT claim struct.
-    pub fn insert_claim<T: Claim>(&mut self, claim: T) -> Option<Value> {
-        self.0.insert(T::key().into(), claim.into())
+    /// Returns an error if the previous value found cannot be parsed
+    /// into the expected claim structure.
+    pub fn insert_claim<T: Claim>(&mut self, claim: T) -> Option<Result<T, Error>> {
+        Some(
+            self.0
+                .insert(T::key().into(), claim.into())?
+                .try_into()
+                .map_err(Error::UnableToParseClaim),
+        )
     }
 
     /// Insert a claim with an integer key.
@@ -28,8 +35,17 @@ impl ClaimsSet {
     }
 
     /// Retrieve a defined CWT claim struct.
-    pub fn get_claim<T: Claim>(&self) -> Option<&Value> {
-        self.0.get(&T::key().into())
+    /// Returns an error if claim key is found but value cannot be parsed
+    /// into expected claim structure.
+    /// N.B. This method clones the underlying data.
+    pub fn get_claim<T: Claim>(&self) -> Option<Result<T, Error>> {
+        Some(
+            self.0
+                .get(&T::key().into())?
+                .clone()
+                .try_into()
+                .map_err(Error::UnableToParseClaim),
+        )
     }
 
     /// Retrieve a claim value with an integer key.
@@ -43,8 +59,15 @@ impl ClaimsSet {
     }
 
     /// Remove a defined CWT claim struct from ClaimsSet.
-    pub fn remove_claim<T: Claim>(&mut self) -> Option<Value> {
-        self.0.remove(&T::key().into())
+    /// Returns an error if the removed value cannot be parsed into
+    /// the expected claim structure.
+    pub fn remove_claim<T: Claim>(&mut self) -> Option<Result<T, Error>> {
+        Some(
+            self.0
+                .remove(&T::key().into())?
+                .try_into()
+                .map_err(Error::UnableToParseClaim),
+        )
     }
 
     /// Remove a claim value with an integer key from ClaimsSet.
@@ -69,11 +92,14 @@ impl ClaimsSet {
 pub enum Error {
     #[error("unable to serialize CWT ClaimsSet: {0}")]
     UnableToSerializeClaimsSet(serde_cbor::Error),
+    #[error("unable to parse value into claim: {0}")]
+    UnableToParseClaim(claim::Error),
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use claim::Claim;
 
     fn test_cases() -> Vec<(&'static str, ClaimsSet, Vec<u8>)> {
         // Checked against coset
@@ -146,5 +172,33 @@ mod test {
                 .unwrap_or_else(|_| panic!("failed to deserialize bytes into claims set {}", case));
             assert_eq!(parsed_claims_set, expected_claims_set, "case: {}", case);
         }
+    }
+
+    #[test]
+    fn get_claim() {
+        let claim = claim::ExpirationTime::new(NumericDate::IntegerSeconds(1444064944));
+        let mut claims_set = ClaimsSet::default();
+        claims_set.insert_claim(claim.clone());
+        assert_eq!(
+            claims_set
+                .get_claim::<claim::ExpirationTime>()
+                .expect("couldn't find claim")
+                .expect("failed to parse claim"),
+            claim
+        );
+    }
+
+    #[test]
+    fn cannot_get_incorrectly_structured_claim() {
+        // Manually construct issuer claim with integer value
+        let mut claims_set = ClaimsSet::default();
+        let Key::Integer(n) = claim::Issuer::key() else {
+            panic!("non-int key for issuer found")
+        };
+        claims_set.insert_i(n, Value::Float(123.45));
+        claims_set
+            .get_claim::<claim::Issuer>()
+            .expect("couldn't find claim")
+            .expect_err("should have failed to parse claim");
     }
 }
