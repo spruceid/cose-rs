@@ -22,6 +22,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_bytes = "0.11.9"
 serde_cbor = { version = "0.11.2", features = ["tags"] }
 signature = "2.0"
+time = "0.3.32"
 thiserror = "1.0"
 
 [dev-dependencies]
