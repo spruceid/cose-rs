@@ -1,3 +1,4 @@
+use fmul_to_int::FloatMulToInt;
 use serde::{Deserialize, Serialize};
 use serde_cbor::Value;
 use time::OffsetDateTime;
@@ -91,16 +92,14 @@ impl TryFrom<NumericDate> for OffsetDateTime {
                 Ok(OffsetDateTime::from_unix_timestamp(i)?)
             }
             NumericDate::FractionalSeconds(f) => {
-                println!("f: {:?}", f);
-                let nanos = (f * (NANOS_PER_SECOND as f64)).trunc();
-                println!("nanos: {:?}", nanos);
-                // OffsetDateTime is more restrictive,
-                // but defer to their error-handling where possible
-                if nanos >= (std::i128::MAX as f64) || nanos <= (std::i128::MIN as f64) {
-                    return Err(Error::ConversionOverflow);
+                if f.is_finite() {
+                    // Compute this in nanoseconds to avoid manually reimplementing logic
+                    // of negative signs before/after UNIX epoch.
+                    if let Ok(nanos) = f.mul_to_int(NANOS_PER_SECOND as f64) {
+                        return Ok(OffsetDateTime::from_unix_timestamp_nanos(nanos)?);
+                    }
                 }
-                let nanos: i128 = nanos as i128;
-                Ok(OffsetDateTime::from_unix_timestamp_nanos(nanos)?)
+                Err(Error::ConversionOverflow)
             }
         }
     }
@@ -218,15 +217,18 @@ impl TryFrom<Value> for CWTId {
 #[cfg(test)]
 mod test {
     use super::*;
-    use time::{Date, Month, Time};
+    use time::{Date, Duration, Month, Time};
 
-    fn success_conversion_cases() -> Vec<(&'static str, OffsetDateTime, NumericDate)> {
+    fn success_conversion_cases() -> Vec<(&'static str, OffsetDateTime, NumericDate, Duration)> {
         vec![
             (
                 "max OffsetDateTime without nanos",
                 OffsetDateTime::new_utc(Date::MAX, Time::from_hms(23, 59, 59).unwrap()),
                 NumericDate::IntegerSeconds(253402300799),
+                Duration::new(0, 0),
             ),
+            // N.B. This case is ignored for conversion into datetime,
+            // see note below
             (
                 "max OffsetDateTime with nanos",
                 OffsetDateTime::new_utc(
@@ -234,21 +236,52 @@ mod test {
                     Time::from_hms_nano(23, 59, 59, 999_999_999).unwrap(),
                 ),
                 NumericDate::FractionalSeconds(253402300799.999999999),
+                Duration::new(0, 1000),
+            ),
+            (
+                "max OffsetDateTime (15 sig figs) with nanos",
+                OffsetDateTime::new_utc(
+                    Date::MAX,
+                    Time::from_hms_nano(23, 59, 59, 999_000_000).unwrap(),
+                ),
+                NumericDate::FractionalSeconds(253402300799.999),
+                Duration::new(0, 10000000),
             ),
             (
                 "min OffsetDateTime without nanos",
                 OffsetDateTime::new_utc(Date::MIN, Time::from_hms(0, 0, 0).unwrap()),
                 NumericDate::IntegerSeconds(-377705116800),
+                Duration::new(0, 0),
             ),
             (
                 "min OffsetDateTime with 1 nano",
                 OffsetDateTime::new_utc(Date::MIN, Time::from_hms_nano(0, 0, 0, 1).unwrap()),
                 NumericDate::FractionalSeconds(-377705116799.99999999),
+                Duration::new(0, 100000),
+            ),
+            (
+                "min OffsetDateTime with 1 nano (15 sig figs)",
+                OffsetDateTime::new_utc(
+                    Date::MIN,
+                    Time::from_hms_nano(0, 0, 0, 1_000_000).unwrap(),
+                ),
+                NumericDate::FractionalSeconds(-377705116799.999),
+                Duration::new(0, 100000),
             ),
             (
                 "UNIX epoch",
                 OffsetDateTime::UNIX_EPOCH,
                 NumericDate::IntegerSeconds(0),
+                Duration::new(0, 0),
+            ),
+            (
+                "normal date close to UNIX epoch with nanos",
+                OffsetDateTime::new_utc(
+                    Date::from_calendar_date(1970, Month::January, 1).unwrap(),
+                    Time::from_hms_nano(0, 0, 10, 987654321).unwrap(),
+                ),
+                NumericDate::FractionalSeconds(10.987654321),
+                Duration::new(0, 0),
             ),
             (
                 "normal date (+) without nanos",
@@ -257,6 +290,7 @@ mod test {
                     Time::from_hms(16, 40, 32).unwrap(),
                 ),
                 NumericDate::IntegerSeconds(1710088832),
+                Duration::new(0, 0),
             ),
             (
                 "normal date (-) without",
@@ -265,6 +299,7 @@ mod test {
                     Time::from_hms(7, 14, 34).unwrap(),
                 ),
                 NumericDate::IntegerSeconds(-300473126),
+                Duration::new(0, 0),
             ),
             (
                 "normal date (+) with nanos",
@@ -273,6 +308,16 @@ mod test {
                     Time::from_hms_nano(16, 40, 32, 235_432_100).unwrap(),
                 ),
                 NumericDate::FractionalSeconds(1710088832.2354321),
+                Duration::new(0, 10000),
+            ),
+            (
+                "normal date (+) with nanos & f significand = 2^54",
+                OffsetDateTime::new_utc(
+                    Date::from_calendar_date(1970, Month::July, 28).unwrap(),
+                    Time::from_hms_nano(11, 59, 58, 509481984).unwrap(),
+                ),
+                NumericDate::FractionalSeconds(18014398.509481984),
+                Duration::new(0, 1000),
             ),
             (
                 "normal date (-) with nanos",
@@ -281,13 +326,14 @@ mod test {
                     Time::from_hms_nano(7, 14, 34, 800_000_000).unwrap(),
                 ),
                 NumericDate::FractionalSeconds(-300473125.2),
+                Duration::new(0, 100),
             ),
         ]
     }
 
     #[test]
     fn offset_to_numeric_date() {
-        for (case, odt, expected_nd) in success_conversion_cases() {
+        for (case, odt, expected_nd, _) in success_conversion_cases() {
             let nd: NumericDate = odt
                 .try_into()
                 .unwrap_or_else(|_| panic!("failed to convert {}", case));
@@ -297,9 +343,17 @@ mod test {
 
     #[test]
     fn numeric_date_to_offset() {
-        let ignore_cases = ["max OffsetDateTime with nanos"];
+        let ignore_cases = [
+            // This case is ignored because the full float value gets rounded up
+            // before the datetime conversion occurs (due to floating point imprecision
+            // above 15 significant figures), causing the value to be too large (out of range).
+            // Instead, this case is still covered by an almost identical case
+            // ("max OffsetDateTime (15 sig figs) with nanos") which limits the
+            // float value to 15 digits and then rounds down the nanos
+            "max OffsetDateTime with nanos",
+        ];
 
-        for (case, expected_odt, nd) in success_conversion_cases() {
+        for (case, expected_odt, nd, epsilon) in success_conversion_cases() {
             if ignore_cases.contains(&case) {
                 println!("skipping case: {case}");
                 continue;
@@ -313,15 +367,14 @@ mod test {
                     assert_eq!(odt, expected_odt, "case: {}", case);
                 }
                 NumericDate::FractionalSeconds(_) => {
-                    let epsilon = 100;
-                    assert_eq!(
-                        expected_odt.unix_timestamp(),
-                        odt.unix_timestamp(),
-                        "unix timestamp"
-                    );
+                    let difference: Duration = (expected_odt - odt).abs();
                     assert!(
-                        expected_odt.nanosecond().abs_diff(odt.nanosecond()) < epsilon,
-                        "unix timestamp"
+                        difference <= epsilon,
+                        "comparison failure case: {}\ndifference: {}\nexpected: {}\nactual: {}",
+                        case,
+                        difference,
+                        expected_odt,
+                        odt
                     );
                 }
             }

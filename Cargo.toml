@@ -16,6 +16,7 @@ p384 = ["dep:p384"]
 
 [dependencies]
 async-signature = { version = "0.3.0", optional = true }
+fmul-to-int = "1.0.0"
 p256 = { version = "0.13.0", optional = true }
 p384 = { version = "0.13.0", optional = true }
 serde = { version = "1.0", features = ["derive"] }
