@@ -59,6 +59,18 @@ impl From<NumericDate> for Value {
     }
 }
 
+impl TryFrom<Value> for NumericDate {
+    type Error = Error;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Integer(i) => Ok(NumericDate::IntegerSeconds(i)),
+            Value::Float(f) => Ok(NumericDate::FractionalSeconds(f)),
+            _ => Err(Error::NumericDateRequired),
+        }
+    }
+}
+
 const NANOS_PER_SECOND: u32 = 1_000_000_000;
 
 impl TryFrom<NumericDate> for OffsetDateTime {
@@ -152,11 +164,7 @@ macro_rules! try_from_numeric_date {
             type Error = Error;
 
             fn try_from(value: Value) -> Result<Self, Self::Error> {
-                match value {
-                    Value::Integer(i) => Ok(Self(NumericDate::IntegerSeconds(i))),
-                    Value::Float(f) => Ok(Self(NumericDate::FractionalSeconds(f))),
-                    _ => Err(Error::NumericDateRequired),
-                }
+                Ok(Self(value.try_into()?))
             }
         }
     };
