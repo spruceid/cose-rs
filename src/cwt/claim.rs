@@ -16,6 +16,7 @@ pub enum Key {
     Text(String),
     Integer(i128),
 }
+
 impl From<Key> for Value {
     fn from(key: Key) -> Value {
         match key {
@@ -50,6 +51,7 @@ pub enum NumericDate {
     IntegerSeconds(i128),
     FractionalSeconds(f64),
 }
+
 impl From<NumericDate> for Value {
     fn from(value: NumericDate) -> Self {
         match value {
@@ -98,9 +100,14 @@ impl TryFrom<NumericDate> for OffsetDateTime {
         }
     }
 }
+
 impl TryFrom<OffsetDateTime> for NumericDate {
     type Error = Error;
-
+    /// To IntegerSeconds: lossless conversion.
+    /// To FractionalSeconds: computes the f64 from the seconds
+    /// and then converts nanoseconds into a decimal.
+    /// May return an error if too many nanoseconds are returned by OffsetDateTime,
+    /// but that should not happen according to OffsetDateTime's docs.
     fn try_from(value: OffsetDateTime) -> Result<Self, Self::Error> {
         match value.nanosecond() {
             0 => Ok(NumericDate::IntegerSeconds(value.unix_timestamp().into())),
