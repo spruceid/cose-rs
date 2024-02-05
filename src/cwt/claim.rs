@@ -28,30 +28,12 @@ impl From<Key> for Value {
 /// Errors that can occur when parsing values into claims.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("claim requires String value")]
-    StringValueRequired,
     #[error("claim requires NumericDate (int or float)")]
     NumericDateRequired,
-    #[error("claim requires Null value")]
-    NullValueRequired,
-    #[error("claim requires Bool value")]
-    BoolValueRequired,
-    #[error("claim requires Integer value")]
-    IntegerValueRequired,
-    #[error("claim requires Float value")]
-    FloatValueRequired,
     #[error("claim requires Bytes value")]
     BytesValueRequired,
-    #[error("claim requires Text value")]
-    TextValueRequired,
-    #[error("claim requires Array value")]
-    ArrayValueRequired,
-    #[error("claim requires Map value")]
-    MapValueRequired,
-    #[error("claim requires Tag value")]
-    TagValueRequired,
-    #[error("generic parse error {0}")]
-    GenericParseError(String),
+    #[error("conversion error: {0}")]
+    ConversionError(#[from] serde_cbor::Error),
     #[error("TryFromIntError: {0}")]
     TryFromIntError(#[from] std::num::TryFromIntError),
     #[error("OffsetComponentError: {0}")]
@@ -160,10 +142,7 @@ macro_rules! try_from_string {
             type Error = Error;
 
             fn try_from(value: Value) -> Result<Self, Self::Error> {
-                match value {
-                    Value::Text(s) => Ok(Self(s)),
-                    _ => Err(Error::StringValueRequired),
-                }
+                Ok(Self(serde_cbor::value::from_value(value)?))
             }
         }
     };
