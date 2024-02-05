@@ -180,11 +180,10 @@ impl CoseSign1 {
     pub fn claims_set(&self) -> Result<Option<ClaimsSet>> {
         match self.payload() {
             None => Ok(None),
-            Some(payload) => {
-                let claims_set: ClaimsSet = serde_cbor::from_slice(payload)
-                    .map_err(Error::UnableToDeserializeIntoClaimsSet)?;
-                Ok(Some(claims_set))
-            }
+            Some(payload) => serde_cbor::from_slice(payload).map_or_else(
+                |e| Err(Error::UnableToDeserializeIntoClaimsSet(e)),
+                |c| Ok(Some(c)),
+            ),
         }
     }
 }
