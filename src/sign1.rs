@@ -540,19 +540,33 @@ mod test {
         );
 
         let mut claims_set = ClaimsSet::default();
-        claims_set.insert_claim(claim::Issuer::new("coap://as.example.com".into()));
-        claims_set.insert_claim(claim::Subject::new("erikw".into()));
-        claims_set.insert_claim(claim::Audience::new("coap://light.example.com".into()));
-        claims_set.insert_claim(claim::ExpirationTime::new(NumericDate::IntegerSeconds(
-            1444064944,
-        )));
-        claims_set.insert_claim(claim::NotBefore::new(NumericDate::IntegerSeconds(
-            1443944944,
-        )));
-        claims_set.insert_claim(claim::IssuedAt::new(NumericDate::IntegerSeconds(
-            1443944944,
-        )));
-        claims_set.insert_claim(claim::CWTId::new(hex::decode("0b71").unwrap()));
+        claims_set
+            .insert_claim(claim::Issuer::new("coap://as.example.com".into()))
+            .expect("failed to insert issuer");
+        claims_set
+            .insert_claim(claim::Subject::new("erikw".into()))
+            .expect("failed to insert subject");
+        claims_set
+            .insert_claim(claim::Audience::new("coap://light.example.com".into()))
+            .expect("failed to insert audience");
+        claims_set
+            .insert_claim(claim::ExpirationTime::new(NumericDate::IntegerSeconds(
+                1444064944,
+            )))
+            .expect("failed to insert expiration time");
+        claims_set
+            .insert_claim(claim::NotBefore::new(NumericDate::IntegerSeconds(
+                1443944944,
+            )))
+            .expect("failed to insert not before");
+        claims_set
+            .insert_claim(claim::IssuedAt::new(NumericDate::IntegerSeconds(
+                1443944944,
+            )))
+            .expect("failed to insert issued at");
+        claims_set
+            .insert_claim(claim::CWTId::new(hex::decode("0b71").unwrap()))
+            .expect("failed to insert CWT ID");
         (protected, unprotected, claims_set)
     }
 

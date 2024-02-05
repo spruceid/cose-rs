@@ -15,13 +15,14 @@ impl ClaimsSet {
     /// Insert a defined CWT claim struct.
     /// Returns an error if the previous value found cannot be parsed
     /// into the expected claim structure.
-    pub fn insert_claim<T: Claim>(&mut self, claim: T) -> Option<Result<T, Error>> {
-        Some(
-            self.0
-                .insert(T::key().into(), claim.into())?
-                .try_into()
-                .map_err(Error::UnableToParseClaim),
-        )
+    pub fn insert_claim<T: Claim>(&mut self, claim: T) -> Result<Option<T>, Error> {
+        match self.0.insert(T::key().into(), claim.into()) {
+            None => Ok(None),
+            Some(v) => v.try_into().map_or_else(
+                |e| Err(Error::UnableToParseClaim(e)),
+                |claim| Ok(Some(claim)),
+            ),
+        }
     }
 
     /// Insert a claim with an integer key.
@@ -38,14 +39,14 @@ impl ClaimsSet {
     /// Returns an error if claim key is found but value cannot be parsed
     /// into expected claim structure.
     /// N.B. This method clones the underlying data.
-    pub fn get_claim<T: Claim>(&self) -> Option<Result<T, Error>> {
-        Some(
-            self.0
-                .get(&T::key().into())?
-                .clone()
-                .try_into()
-                .map_err(Error::UnableToParseClaim),
-        )
+    pub fn get_claim<T: Claim>(&self) -> Result<Option<T>, Error> {
+        match self.0.get(&T::key().into()) {
+            None => Ok(None),
+            Some(v) => v.clone().try_into().map_or_else(
+                |e| Err(Error::UnableToParseClaim(e)),
+                |claim| Ok(Some(claim)),
+            ),
+        }
     }
 
     /// Retrieve a claim value with an integer key.
@@ -61,13 +62,14 @@ impl ClaimsSet {
     /// Remove a defined CWT claim struct from ClaimsSet.
     /// Returns an error if the removed value cannot be parsed into
     /// the expected claim structure.
-    pub fn remove_claim<T: Claim>(&mut self) -> Option<Result<T, Error>> {
-        Some(
-            self.0
-                .remove(&T::key().into())?
-                .try_into()
-                .map_err(Error::UnableToParseClaim),
-        )
+    pub fn remove_claim<T: Claim>(&mut self) -> Result<Option<T>, Error> {
+        match self.0.remove(&T::key().into()) {
+            None => Ok(None),
+            Some(v) => v.try_into().map_or_else(
+                |e| Err(Error::UnableToParseClaim(e)),
+                |claim| Ok(Some(claim)),
+            ),
+        }
     }
 
     /// Remove a claim value with an integer key from ClaimsSet.
@@ -106,31 +108,59 @@ mod test {
         let serialized1 = hex::decode("a70175636f61703a2f2f61732e6578616d706c652e636f6d02656572696b77037818636f61703a2f2f6c696768742e6578616d706c652e636f6d041a5612aeb005fb41d584367c200000060007420b71").unwrap();
         let mut claims_set1 = ClaimsSet::default();
         // Basic test case tweaks RFC8392 example to include fractional & "0" dates
-        claims_set1.insert_claim(claim::Issuer::new("coap://as.example.com".into()));
-        claims_set1.insert_claim(claim::Subject::new("erikw".into()));
-        claims_set1.insert_claim(claim::Audience::new("coap://light.example.com".into()));
-        claims_set1.insert_claim(claim::ExpirationTime::new(NumericDate::IntegerSeconds(
-            1444064944,
-        )));
-        claims_set1.insert_claim(claim::NotBefore::new(NumericDate::FractionalSeconds(
-            1443944944.5,
-        )));
-        claims_set1.insert_claim(claim::IssuedAt::new(NumericDate::IntegerSeconds(0)));
-        claims_set1.insert_claim(claim::CWTId::new(hex::decode("0b71").unwrap()));
+        claims_set1
+            .insert_claim(claim::Issuer::new("coap://as.example.com".into()))
+            .expect("claims_set1: failed to insert issuer");
+        claims_set1
+            .insert_claim(claim::Subject::new("erikw".into()))
+            .expect("claims_set1: failed to insert subject");
+        claims_set1
+            .insert_claim(claim::Audience::new("coap://light.example.com".into()))
+            .expect("claims_set1: failed to insert audience");
+        claims_set1
+            .insert_claim(claim::ExpirationTime::new(NumericDate::IntegerSeconds(
+                1444064944,
+            )))
+            .expect("claims_set1: failed to insert expiration time");
+        claims_set1
+            .insert_claim(claim::NotBefore::new(NumericDate::FractionalSeconds(
+                1443944944.5,
+            )))
+            .expect("claims_set1: failed to insert not before");
+        claims_set1
+            .insert_claim(claim::IssuedAt::new(NumericDate::IntegerSeconds(0)))
+            .expect("claims_set1: failed to insert issued at");
+        claims_set1
+            .insert_claim(claim::CWTId::new(hex::decode("0b71").unwrap()))
+            .expect("claims_set1: failed to insert CWT ID");
 
         // Reordered case above
         let mut claims_set2 = ClaimsSet::default();
-        claims_set2.insert_claim(claim::IssuedAt::new(NumericDate::IntegerSeconds(0)));
-        claims_set2.insert_claim(claim::Subject::new("erikw".into()));
-        claims_set2.insert_claim(claim::NotBefore::new(NumericDate::FractionalSeconds(
-            1443944944.5,
-        )));
-        claims_set2.insert_claim(claim::CWTId::new(hex::decode("0b71").unwrap()));
-        claims_set2.insert_claim(claim::ExpirationTime::new(NumericDate::IntegerSeconds(
-            1444064944,
-        )));
-        claims_set2.insert_claim(claim::Audience::new("coap://light.example.com".into()));
-        claims_set2.insert_claim(claim::Issuer::new("coap://as.example.com".into()));
+        claims_set2
+            .insert_claim(claim::IssuedAt::new(NumericDate::IntegerSeconds(0)))
+            .expect("claims_set2: failed to insert issuer (with date value)");
+        claims_set2
+            .insert_claim(claim::Subject::new("erikw".into()))
+            .expect("claims_set2: failed to insert subject");
+        claims_set2
+            .insert_claim(claim::NotBefore::new(NumericDate::FractionalSeconds(
+                1443944944.5,
+            )))
+            .expect("claims_set2: failed to insert not before");
+        claims_set2
+            .insert_claim(claim::CWTId::new(hex::decode("0b71").unwrap()))
+            .expect("claims_set2: failed to insert CWT ID");
+        claims_set2
+            .insert_claim(claim::ExpirationTime::new(NumericDate::IntegerSeconds(
+                1444064944,
+            )))
+            .expect("claims_set2: failed to insert expiration time");
+        claims_set2
+            .insert_claim(claim::Audience::new("coap://light.example.com".into()))
+            .expect("claims_set2: failed to insert audience");
+        claims_set2
+            .insert_claim(claim::Issuer::new("coap://as.example.com".into()))
+            .expect("claims_set2: failed to insert issuer");
 
         let serialized3 =
             hex::decode("a23a000f423ffbc059161e4f765fd967746573746b6579393038").unwrap();
@@ -178,12 +208,14 @@ mod test {
     fn get_claim() {
         let claim = claim::ExpirationTime::new(NumericDate::IntegerSeconds(1444064944));
         let mut claims_set = ClaimsSet::default();
-        claims_set.insert_claim(claim.clone());
+        claims_set
+            .insert_claim(claim.clone())
+            .expect("failed to insert claim");
         assert_eq!(
             claims_set
                 .get_claim::<claim::ExpirationTime>()
-                .expect("couldn't find claim")
-                .expect("failed to parse claim"),
+                .expect("failed to parse claim")
+                .expect("couldn't find claim"),
             claim
         );
     }
@@ -198,7 +230,6 @@ mod test {
         claims_set.insert_i(n, Value::Float(123.45));
         claims_set
             .get_claim::<claim::Issuer>()
-            .expect("couldn't find claim")
             .expect_err("should have failed to parse claim");
     }
 }
