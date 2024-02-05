@@ -177,11 +177,15 @@ impl CoseSign1 {
         self.inner.2.as_ref()
     }
 
-    pub fn claims_set(&self) -> Option<Result<ClaimsSet>> {
-        let payload = self.payload()?;
-        let claims_set: Result<ClaimsSet> =
-            serde_cbor::from_slice(payload).map_err(Error::UnableToDeserializeIntoClaimsSet);
-        Some(claims_set)
+    pub fn claims_set(&self) -> Result<Option<ClaimsSet>> {
+        match self.payload() {
+            None => Ok(None),
+            Some(payload) => {
+                let claims_set: ClaimsSet = serde_cbor::from_slice(payload)
+                    .map_err(Error::UnableToDeserializeIntoClaimsSet)?;
+                Ok(Some(claims_set))
+            }
+        }
     }
 }
 
@@ -582,8 +586,8 @@ mod test {
             .expect("failed to parse COSE_Sign1 from bytes");
         let parsed_claims_set = cose_sign1
             .claims_set()
-            .expect("retrieved empty claims set")
-            .expect("failed to parse claims set from payload");
+            .expect("failed to parse claims set from payload")
+            .expect("retrieved empty claims set");
         let (_, _, expected_claims_set) = rfc8392_example_inputs();
         assert_eq!(parsed_claims_set, expected_claims_set);
     }
