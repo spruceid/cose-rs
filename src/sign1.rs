@@ -1,4 +1,5 @@
 use crate::algorithm::{Algorithm, SignatureAlgorithm};
+use crate::cwt::{self, ClaimsSet};
 pub use crate::{header_map::HeaderMap, protected::Protected};
 use serde::{
     de::{self, Error as DeError},
@@ -71,6 +72,8 @@ pub enum Error {
     UnableToSerializeProtected(serde_cbor::Error),
     #[error("unable to serialize COSE_Sign1 signature payload: {0}")]
     UnableToSerializeSignaturePayload(serde_cbor::Error),
+    #[error("unable to set ClaimsSet: {0}")]
+    UnableToDeserializeIntoClaimsSet(serde_cbor::Error),
 }
 
 /// Result with error type: [`Error`].
@@ -173,6 +176,16 @@ impl CoseSign1 {
     pub fn payload(&self) -> Option<&ByteBuf> {
         self.inner.2.as_ref()
     }
+
+    pub fn claims_set(&self) -> Result<Option<ClaimsSet>> {
+        match self.payload() {
+            None => Ok(None),
+            Some(payload) => serde_cbor::from_slice(payload).map_or_else(
+                |e| Err(Error::UnableToDeserializeIntoClaimsSet(e)),
+                |c| Ok(Some(c)),
+            ),
+        }
+    }
 }
 
 impl ser::Serialize for CoseSign1 {
@@ -262,6 +275,11 @@ impl Builder {
     {
         self.payload = Some(ByteBuf::from(p));
         self
+    }
+
+    pub fn claims_set(self, claims_set: ClaimsSet) -> Result<Self, cwt::Error> {
+        let serialized_claims = claims_set.serialize()?;
+        Ok(self.payload(serialized_claims))
     }
 
     /// Set the signature algorithm in the protected headers.
@@ -410,6 +428,8 @@ fn signature_payload(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::cwt::{claim, NumericDate};
+
     use hex::FromHex;
     use p256::{
         ecdsa::{Signature, SigningKey, VerifyingKey},
@@ -418,6 +438,9 @@ mod test {
 
     static COSE_SIGN1: &str = include_str!("../tests/sign1/serialized.cbor");
     static COSE_KEY: &str = include_str!("../tests/sign1/secret_key");
+
+    const RFC8392_KEY: &str = "6c1382765aec5358f117733d281c1c7bdc39884d04a45a1e6c67c858bc206c19";
+    const RFC8392_COSE_SIGN1: &str = "d28443a10126a104524173796d6d657472696345434453413235365850a70175636f61703a2f2f61732e6578616d706c652e636f6d02656572696b77037818636f61703a2f2f6c696768742e6578616d706c652e636f6d041a5612aeb0051a5610d9f0061a5610d9f007420b7158405427c1ff28d23fbad1f29c4c7c6a555e601d6fa29f9179bc3d7438bacaca5acd08c8d4d4f96131680c429a01f85951ecee743a52b9b63632c57209120e1c9e30";
 
     #[test]
     fn roundtrip() {
@@ -501,5 +524,84 @@ mod test {
             .verify::<VerifyingKey, Signature>(&verifier, None, None)
             .to_result()
             .expect("COSE_Sign1 could not be verified")
+    }
+
+    fn rfc8392_example_inputs() -> (HeaderMap, HeaderMap, ClaimsSet) {
+        let mut protected = HeaderMap::default();
+        protected.insert_i(1, serde_cbor::Value::Integer(-7));
+
+        let mut unprotected = HeaderMap::default();
+        unprotected.insert_i(
+            4, // kid
+            serde_cbor::Value::Bytes(
+                hex::decode("4173796d6d65747269634543445341323536").expect("error decoding key id"),
+            ),
+        );
+
+        let mut claims_set = ClaimsSet::default();
+        claims_set
+            .insert_claim(claim::Issuer::new("coap://as.example.com".into()))
+            .expect("failed to insert issuer");
+        claims_set
+            .insert_claim(claim::Subject::new("erikw".into()))
+            .expect("failed to insert subject");
+        claims_set
+            .insert_claim(claim::Audience::new("coap://light.example.com".into()))
+            .expect("failed to insert audience");
+        claims_set
+            .insert_claim(claim::ExpirationTime::new(NumericDate::IntegerSeconds(
+                1444064944,
+            )))
+            .expect("failed to insert expiration time");
+        claims_set
+            .insert_claim(claim::NotBefore::new(NumericDate::IntegerSeconds(
+                1443944944,
+            )))
+            .expect("failed to insert not before");
+        claims_set
+            .insert_claim(claim::IssuedAt::new(NumericDate::IntegerSeconds(
+                1443944944,
+            )))
+            .expect("failed to insert issued at");
+        claims_set
+            .insert_claim(claim::CWTId::new(hex::decode("0b71").unwrap()))
+            .expect("failed to insert CWT ID");
+        (protected, unprotected, claims_set)
+    }
+
+    #[test]
+    fn signing_cwt() {
+        // Using key from RFC8392 example
+        let bytes = hex::decode(RFC8392_KEY).unwrap();
+        let signer: SigningKey = SecretKey::from_slice(&bytes).unwrap().into();
+        let (protected, unprotected, claims_set) = rfc8392_example_inputs();
+        let cose_sign1 = CoseSign1::builder()
+            .protected(protected)
+            .unprotected(unprotected)
+            .claims_set(claims_set)
+            .expect("failed to set claims set")
+            .tagged()
+            .sign::<SigningKey, Signature>(&signer)
+            .expect("failed to sign CWT");
+        let serialized =
+            serde_cbor::to_vec(&cose_sign1).expect("failed to serialize COSE_Sign1 to bytes");
+        let expected = hex::decode(RFC8392_COSE_SIGN1).unwrap();
+        assert_eq!(
+            expected, serialized,
+            "expected COSE_Sign1 and signed CWT do not match"
+        );
+    }
+
+    #[test]
+    fn deserializing_signed_cwt() {
+        let cose_sign1_bytes = hex::decode(RFC8392_COSE_SIGN1).unwrap();
+        let cose_sign1: CoseSign1 = serde_cbor::from_slice(&cose_sign1_bytes)
+            .expect("failed to parse COSE_Sign1 from bytes");
+        let parsed_claims_set = cose_sign1
+            .claims_set()
+            .expect("failed to parse claims set from payload")
+            .expect("retrieved empty claims set");
+        let (_, _, expected_claims_set) = rfc8392_example_inputs();
+        assert_eq!(parsed_claims_set, expected_claims_set);
     }
 }

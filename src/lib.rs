@@ -6,6 +6,7 @@
 /// COSE algorithms.
 #[allow(non_camel_case_types)]
 pub mod algorithm;
+pub mod cwt;
 mod header_map;
 mod protected;
 /// Implementation of COSE_Sign1.
