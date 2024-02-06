@@ -204,20 +204,30 @@ mod test {
         }
     }
 
-    #[test]
-    fn get_claim() {
-        let claim = claim::ExpirationTime::new(NumericDate::IntegerSeconds(1444064944));
+    fn test_get_claim<T: Claim + Clone + PartialEq + std::fmt::Debug>(claim: T, case_name: &str) {
         let mut claims_set = ClaimsSet::default();
         claims_set
             .insert_claim(claim.clone())
-            .expect("failed to insert claim");
+            .unwrap_or_else(|_| panic!("{}: failed to insert claim", case_name));
         assert_eq!(
             claims_set
-                .get_claim::<claim::ExpirationTime>()
-                .expect("failed to parse claim")
-                .expect("couldn't find claim"),
+                .get_claim::<T>()
+                .unwrap_or_else(|_| panic!("{}: failed to parse claim", case_name))
+                .unwrap_or_else(|| panic!("{}: couldn't find claim", case_name)),
             claim
         );
+    }
+
+    #[test]
+    fn get_claim() {
+        // Ensure that we can get a structured claim of each data type
+        let issuer = claim::Issuer::new("test text".into());
+        let exp = claim::ExpirationTime::new(NumericDate::IntegerSeconds(1444064944));
+        let cwt_id = claim::CWTId::new(hex::decode("0b71").unwrap());
+
+        test_get_claim(issuer, "issuer (String value)");
+        test_get_claim(exp, "expiration time (NumericDate value)");
+        test_get_claim(cwt_id, "CWT ID (Bytes value)");
     }
 
     #[test]

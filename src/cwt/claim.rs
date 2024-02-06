@@ -47,6 +47,7 @@ pub enum Error {
 /// as defined in [RFC7049](https://www.rfc-editor.org/rfc/rfc7049#section-2.4.1)
 /// with the leading tag 1 omitted.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(try_from = "Value", into = "Value")]
 pub enum NumericDate {
     IntegerSeconds(i128),
     FractionalSeconds(f64),
@@ -149,13 +150,7 @@ macro_rules! define_claim {
                 value.0.into()
             }
         }
-    };
-}
 
-/// Macros for implementing TryFrom<Value, Error = Error>
-/// for String and NumericDate to eliminate some boilerplate.
-macro_rules! try_from_string {
-    ($name:ident) => {
         impl TryFrom<Value> for $name {
             type Error = Error;
 
@@ -165,44 +160,43 @@ macro_rules! try_from_string {
         }
     };
 }
-macro_rules! try_from_numeric_date {
-    ($name:ident) => {
-        impl TryFrom<Value> for $name {
-            type Error = Error;
-
-            fn try_from(value: Value) -> Result<Self, Self::Error> {
-                Ok(Self(value.try_into()?))
-            }
-        }
-    };
-}
 
 define_claim!(Issuer, String, Key::Integer(1));
-try_from_string!(Issuer);
-
 define_claim!(Subject, String, Key::Integer(2));
-try_from_string!(Subject);
-
 define_claim!(Audience, String, Key::Integer(3));
-try_from_string!(Audience);
-
 define_claim!(ExpirationTime, NumericDate, Key::Integer(4));
-try_from_numeric_date!(ExpirationTime);
-
 define_claim!(NotBefore, NumericDate, Key::Integer(5));
-try_from_numeric_date!(NotBefore);
-
 define_claim!(IssuedAt, NumericDate, Key::Integer(6));
-try_from_numeric_date!(IssuedAt);
 
-define_claim!(CWTId, Vec<u8>, Key::Integer(7));
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(try_from = "Value", into = "Value")]
+pub struct CWTId(Vec<u8>);
+impl CWTId {
+    pub fn new(value: Vec<u8>) -> CWTId {
+        CWTId(value)
+    }
+}
+
+impl Claim for CWTId {
+    fn key() -> Key {
+        Key::Integer(7)
+    }
+}
+
+impl From<CWTId> for Value {
+    fn from(value: CWTId) -> Self {
+        value.0.into()
+    }
+}
+
 impl TryFrom<Value> for CWTId {
     type Error = Error;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
-        match value {
-            Value::Bytes(b) => Ok(Self(b)),
-            _ => Err(Error::BytesValueRequired),
+        if let Value::Bytes(bytes) = value {
+            Ok(CWTId(bytes))
+        } else {
+            Err(Error::BytesValueRequired)
         }
     }
 }
