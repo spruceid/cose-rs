@@ -107,7 +107,6 @@ impl TryFrom<BTreeMap<Value, Value>> for ClaimsSet {
     type Error = Error;
 
     fn try_from(m: BTreeMap<Value, Value>) -> Result<Self, Self::Error> {
-        // Ensure keys are valid
         let mut claims_set = ClaimsSet::default();
 
         for (k, v) in m.iter() {
