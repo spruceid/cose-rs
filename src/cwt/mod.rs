@@ -6,6 +6,9 @@ use std::collections::BTreeMap;
 
 pub use crate::cwt::claim::{Claim, Key, NumericDate};
 
+#[cfg(feature = "numericdate-conversion")]
+pub mod numericdate_conversion;
+
 /// Representation of a CWT claims set (a CBOR map containing CWT claims),
 /// as defined in [RFC8392](https://datatracker.ietf.org/doc/html/rfc8392).
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
