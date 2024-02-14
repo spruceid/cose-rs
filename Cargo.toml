@@ -11,7 +11,7 @@ license = "Apache-2.0"
 [features]
 default = ["p256", "p384"]
 async = ["async-signature"]
-numericdate-conversion = ["dep:time", "dep:fmul-to-int"]
+time = ["dep:time", "dep:fmul-to-int"]
 p256 = ["dep:p256"]
 p384 = ["dep:p384"]
 
