@@ -6,6 +6,9 @@ use std::collections::BTreeMap;
 
 pub use crate::cwt::claim::{Claim, Key, NumericDate};
 
+#[cfg(feature = "time")]
+pub mod numericdate_conversion;
+
 /// Representation of a CWT claims set (a CBOR map containing CWT claims),
 /// as defined in [RFC8392](https://datatracker.ietf.org/doc/html/rfc8392).
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -96,6 +99,27 @@ pub enum Error {
     UnableToSerializeClaimsSet(serde_cbor::Error),
     #[error("unable to parse value into claim: {0}")]
     UnableToParseClaim(claim::Error),
+    #[error("found invalid CWT Key: ${0}")]
+    InvalidCwtKey(String),
+}
+
+impl TryFrom<BTreeMap<Value, Value>> for ClaimsSet {
+    type Error = Error;
+
+    fn try_from(m: BTreeMap<Value, Value>) -> Result<Self, Self::Error> {
+        let mut claims_set = ClaimsSet::default();
+
+        for (k, v) in m.iter() {
+            match k {
+                Value::Text(s) => claims_set.insert_t(s.clone(), v.clone()),
+                Value::Integer(i) => claims_set.insert_i(*i, v.clone()),
+                invalid_key_type => {
+                    return Err(Error::InvalidCwtKey(format!("{:?}", invalid_key_type)))
+                }
+            };
+        }
+        Ok(claims_set)
+    }
 }
 
 #[cfg(test)]
@@ -165,9 +189,12 @@ mod test {
         let serialized3 =
             hex::decode("a23a000f423ffbc059161e4f765fd967746573746b6579393038").unwrap();
 
-        let mut claims_set3 = ClaimsSet::default();
-        claims_set3.insert_t("testkey", Value::Integer(-12345));
-        claims_set3.insert_i(-1000000, Value::Float(-100.3456));
+        let claims_set3: ClaimsSet = BTreeMap::from([
+            (Value::Text("testkey".into()), Value::Integer(-12345)),
+            (Value::Integer(-1000000), Value::Float(-100.3456)),
+        ])
+        .try_into()
+        .expect("converting from BTreeMap failed");
 
         // Add and remove keys to ensure this doesn't change serialization
         let mut claims_set4 = claims_set1.clone();
