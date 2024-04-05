@@ -122,6 +122,12 @@ impl TryFrom<BTreeMap<Value, Value>> for ClaimsSet {
     }
 }
 
+impl AsRef<BTreeMap<Value, Value>> for ClaimsSet {
+    fn as_ref(&self) -> &BTreeMap<Value, Value> {
+        &self.0
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
