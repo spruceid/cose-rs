@@ -19,7 +19,7 @@ impl ClaimsSet {
     /// Returns an error if the previous value found cannot be parsed
     /// into the expected claim structure.
     pub fn insert_claim<T: Claim>(&mut self, claim: T) -> Result<Option<T>, Error> {
-        match self.0.insert(T::key().into(), claim.into()) {
+        match self.0.insert(T::key(), claim.into()) {
             None => Ok(None),
             Some(v) => v.try_into().map_or_else(
                 |e| Err(Error::UnableToParseClaim(e)),
