@@ -177,6 +177,7 @@ impl CoseSign1 {
         self.inner.2.as_ref()
     }
 
+    /// Retrieve the CWT claims set.
     pub fn claims_set(&self) -> Result<Option<ClaimsSet>> {
         match self.payload() {
             None => Ok(None),
@@ -277,6 +278,7 @@ impl Builder {
         self
     }
 
+    /// Set the CWT claims set.
     pub fn claims_set(self, claims_set: ClaimsSet) -> Result<Self, cwt::Error> {
         let serialized_claims = claims_set.serialize()?;
         Ok(self.payload(serialized_claims))
