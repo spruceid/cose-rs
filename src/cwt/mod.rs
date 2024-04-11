@@ -12,14 +12,14 @@ pub mod numericdate_conversion;
 /// Representation of a CWT claims set (a CBOR map containing CWT claims),
 /// as defined in [RFC8392](https://datatracker.ietf.org/doc/html/rfc8392).
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
-pub struct ClaimsSet(BTreeMap<Value, Value>);
+pub struct ClaimsSet(BTreeMap<Key, Value>);
 
 impl ClaimsSet {
     /// Insert a defined CWT claim struct.
     /// Returns an error if the previous value found cannot be parsed
     /// into the expected claim structure.
     pub fn insert_claim<T: Claim>(&mut self, claim: T) -> Result<Option<T>, Error> {
-        match self.0.insert(T::key().into(), claim.into()) {
+        match self.0.insert(T::key(), claim.into()) {
             None => Ok(None),
             Some(v) => v.try_into().map_or_else(
                 |e| Err(Error::UnableToParseClaim(e)),
@@ -30,12 +30,12 @@ impl ClaimsSet {
 
     /// Insert a claim with an integer key.
     pub fn insert_i<T: Into<i128>>(&mut self, key: T, value: Value) -> Option<Value> {
-        self.0.insert(Value::Integer(key.into()), value)
+        self.0.insert(Key::Integer(key.into()), value)
     }
 
     /// Insert a claim with a text key.
     pub fn insert_t<T: Into<String>>(&mut self, key: T, value: Value) -> Option<Value> {
-        self.0.insert(Value::Text(key.into()), value)
+        self.0.insert(Key::Text(key.into()), value)
     }
 
     /// Retrieve a defined CWT claim struct.
@@ -43,7 +43,7 @@ impl ClaimsSet {
     /// into expected claim structure.
     /// N.B. This method clones the underlying data.
     pub fn get_claim<T: Claim>(&self) -> Result<Option<T>, Error> {
-        match self.0.get(&T::key().into()) {
+        match self.0.get(&T::key()) {
             None => Ok(None),
             Some(v) => v.clone().try_into().map_or_else(
                 |e| Err(Error::UnableToParseClaim(e)),
@@ -54,19 +54,19 @@ impl ClaimsSet {
 
     /// Retrieve a claim value with an integer key.
     pub fn get_i<T: Into<i128>>(&self, key: T) -> Option<&Value> {
-        self.0.get(&Value::Integer(key.into()))
+        self.0.get(&Key::Integer(key.into()))
     }
 
     /// Retrieve a claim value with a text key.
     pub fn get_t<T: Into<String>>(&self, key: T) -> Option<&Value> {
-        self.0.get(&Value::Text(key.into()))
+        self.0.get(&Key::Text(key.into()))
     }
 
     /// Remove a defined CWT claim struct from ClaimsSet.
     /// Returns an error if the removed value cannot be parsed into
     /// the expected claim structure.
     pub fn remove_claim<T: Claim>(&mut self) -> Result<Option<T>, Error> {
-        match self.0.remove(&T::key().into()) {
+        match self.0.remove(&T::key()) {
             None => Ok(None),
             Some(v) => v.try_into().map_or_else(
                 |e| Err(Error::UnableToParseClaim(e)),
@@ -77,12 +77,12 @@ impl ClaimsSet {
 
     /// Remove a claim value with an integer key from ClaimsSet.
     pub fn remove_i<T: Into<i128>>(&mut self, key: T) -> Option<Value> {
-        self.0.remove(&Value::Integer(key.into()))
+        self.0.remove(&Key::Integer(key.into()))
     }
 
     /// Remove a claim value with a text key from ClaimsSet.
     pub fn remove_t<T: Into<String>>(&mut self, key: T) -> Option<Value> {
-        self.0.remove(&Value::Text(key.into()))
+        self.0.remove(&Key::Text(key.into()))
     }
 
     /// Serialize the ClaimsSet to CBOR bytes, so that it
@@ -103,28 +103,41 @@ pub enum Error {
     InvalidCwtKey(String),
 }
 
+impl FromIterator<(Key, Value)> for ClaimsSet {
+    fn from_iter<T: IntoIterator<Item = (Key, Value)>>(iter: T) -> Self {
+        Self(BTreeMap::from_iter(iter))
+    }
+}
+
 impl TryFrom<BTreeMap<Value, Value>> for ClaimsSet {
     type Error = Error;
 
     fn try_from(m: BTreeMap<Value, Value>) -> Result<Self, Self::Error> {
-        let mut claims_set = ClaimsSet::default();
-
-        for (k, v) in m.iter() {
-            match k {
-                Value::Text(s) => claims_set.insert_t(s.clone(), v.clone()),
-                Value::Integer(i) => claims_set.insert_i(*i, v.clone()),
-                invalid_key_type => {
-                    return Err(Error::InvalidCwtKey(format!("{:?}", invalid_key_type)))
-                }
-            };
-        }
-        Ok(claims_set)
+        m.into_iter()
+            .map(|(k, v)| Ok((Key::try_from(k)?, v)))
+            .collect()
     }
 }
 
-impl AsRef<BTreeMap<Value, Value>> for ClaimsSet {
-    fn as_ref(&self) -> &BTreeMap<Value, Value> {
+impl AsRef<BTreeMap<Key, Value>> for ClaimsSet {
+    fn as_ref(&self) -> &BTreeMap<Key, Value> {
         &self.0
+    }
+}
+
+impl AsMut<BTreeMap<Key, Value>> for ClaimsSet {
+    fn as_mut(&mut self) -> &mut BTreeMap<Key, Value> {
+        &mut self.0
+    }
+}
+
+impl IntoIterator for ClaimsSet {
+    type Item = (Key, Value);
+
+    type IntoIter = <BTreeMap<Key, Value> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
     }
 }
 
@@ -193,7 +206,7 @@ mod test {
             .expect("claims_set2: failed to insert issuer");
 
         let serialized3 =
-            hex::decode("a23a000f423ffbc059161e4f765fd967746573746b6579393038").unwrap();
+            hex::decode("a267746573746b65793930383a000f423ffbc059161e4f765fd9").unwrap();
 
         let claims_set3: ClaimsSet = BTreeMap::from([
             (Value::Text("testkey".into()), Value::Integer(-12345)),
