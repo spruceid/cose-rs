@@ -10,7 +10,7 @@ pub trait Claim: Into<Value> + TryFrom<Value, Error = Error> {
 /// Representation of the CBOR map key used to identify a claim
 /// within a CWT claims set, and restricted to text and integer values,
 /// per [RFC8392](https://datatracker.ietf.org/doc/html/rfc8392).
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, PartialOrd, Ord, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, PartialOrd, Ord, Eq, Hash)]
 #[serde(try_from = "Value", into = "Value")]
 pub enum Key {
     Text(String),
@@ -38,6 +38,18 @@ impl TryFrom<Value> for Key {
                 invalid_key_type
             ))),
         }
+    }
+}
+
+impl From<String> for Key {
+    fn from(key: String) -> Self {
+        Key::Text(key)
+    }
+}
+
+impl From<i128> for Key {
+    fn from(key: i128) -> Self {
+        Key::Integer(key)
     }
 }
 
