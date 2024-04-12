@@ -98,6 +98,22 @@ impl Deref for HeaderMap {
     }
 }
 
+impl FromIterator<(Key, Value)> for HeaderMap {
+    fn from_iter<T: IntoIterator<Item = (Key, Value)>>(iter: T) -> Self {
+        Self(BTreeMap::from_iter(iter))
+    }
+}
+
+impl TryFrom<BTreeMap<Value, Value>> for HeaderMap {
+    type Error = Error;
+
+    fn try_from(m: BTreeMap<Value, Value>) -> Result<Self, Self::Error> {
+        m.into_iter()
+            .map(|(k, v)| Ok((Key::try_from(k)?, v)))
+            .collect()
+    }
+}
+
 impl From<BTreeMap<Key, Value>> for HeaderMap {
     fn from(m: BTreeMap<Key, Value>) -> Self {
         Self(m)
