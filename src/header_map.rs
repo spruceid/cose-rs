@@ -139,7 +139,7 @@ pub trait Header: Into<Value> + TryFrom<Value, Error = serde_cbor::Error> {
 /// Custom value_type's must implement From<value_type> for serde_cbor::Value.
 macro_rules! define_header {
     ($name:ident, $value_type: ty, $key: expr) => {
-        #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+        #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, PartialOrd, Eq, Ord, Hash)]
         pub struct $name($value_type);
         impl $name {
             pub fn new(value: $value_type) -> $name {

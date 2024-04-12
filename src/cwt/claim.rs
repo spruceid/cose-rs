@@ -67,7 +67,7 @@ pub enum Error {
 /// Numerical representation of seconds relative to the Unix Epoch,
 /// as defined in [RFC7049](https://www.rfc-editor.org/rfc/rfc7049#section-2.4.1)
 /// with the leading tag 1 omitted.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, PartialOrd)]
 #[serde(try_from = "Value", into = "Value")]
 pub enum NumericDate {
     IntegerSeconds(i128),
@@ -100,7 +100,7 @@ impl TryFrom<Value> for NumericDate {
 /// Custom value_type's must implement From<value_type> for serde_cbor::Value.
 macro_rules! define_claim {
     ($name:ident, $value_type: ty, $key: expr) => {
-        #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+        #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, PartialOrd)]
         pub struct $name(pub $value_type);
         impl $name {
             pub fn new(value: $value_type) -> $name {
@@ -137,7 +137,7 @@ define_claim!(ExpirationTime, NumericDate, Key::Integer(4));
 define_claim!(NotBefore, NumericDate, Key::Integer(5));
 define_claim!(IssuedAt, NumericDate, Key::Integer(6));
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[serde(try_from = "Value", into = "Value")]
 pub struct CWTId(Vec<u8>);
 impl CWTId {
