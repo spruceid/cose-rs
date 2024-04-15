@@ -1,4 +1,5 @@
 use crate::header_map::Header;
+use serde::de::Error;
 use serde_cbor::Value;
 use std::convert::TryFrom;
 use std::fmt;
@@ -378,7 +379,7 @@ impl Header for Algorithm {
 
 impl From<Algorithm> for Value {
     fn from(value: Algorithm) -> Self {
-        Value::Text(value.to_string())
+        Value::Integer(value.value().into())
     }
 }
 
@@ -386,7 +387,9 @@ impl TryFrom<Value> for Algorithm {
     type Error = serde_cbor::Error;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
-        Ok(serde_cbor::value::from_value::<String>(value)?.parse()?)
+        serde_cbor::value::from_value::<i32>(value)?
+            .try_into()
+            .map_err(serde_cbor::Error::custom)
     }
 }
 

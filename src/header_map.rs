@@ -169,5 +169,4 @@ macro_rules! define_header {
     };
 }
 
-define_header!(Algorithm, String, Key::Integer(1));
 define_header!(X5Chain, Vec<u8>, Key::Integer(33));
