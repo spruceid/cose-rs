@@ -89,7 +89,7 @@ impl TryFrom<Value> for NumericDate {
 macro_rules! define_claim {
     ($name:ident, $value_type: ty, $key: expr) => {
         #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-        pub struct $name($value_type);
+        pub struct $name(pub $value_type);
         impl $name {
             pub fn new(value: $value_type) -> $name {
                 $name(value)
