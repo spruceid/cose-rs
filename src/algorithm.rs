@@ -1,3 +1,5 @@
+use crate::header_map::Header;
+use serde_cbor::Value;
 use std::convert::TryFrom;
 use std::fmt;
 
@@ -8,7 +10,7 @@ pub trait SignatureAlgorithm {
 
 /// COSE algorithms from the
 /// [IANA COSE Algorithms registry](https://www.iana.org/assignments/cose/cose.xhtml#algorithms).
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub enum Algorithm {
     RS1,
     WalnutDSA,
@@ -365,6 +367,26 @@ impl TryFrom<i32> for Algorithm {
 impl fmt::Display for Algorithm {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.name())
+    }
+}
+
+impl Header for Algorithm {
+    fn key() -> crate::header_map::Key {
+        crate::header_map::Key::Integer(1)
+    }
+}
+
+impl From<Algorithm> for Value {
+    fn from(value: Algorithm) -> Self {
+        Value::Text(value.to_string())
+    }
+}
+
+impl TryFrom<Value> for Algorithm {
+    type Error = serde_cbor::Error;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        Ok(serde_cbor::value::from_value::<String>(value)?.parse()?)
     }
 }
 
