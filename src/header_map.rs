@@ -179,6 +179,7 @@ impl TryFrom<Value> for X5Chain {
 /// Simple macro for defining generic claims with implementations of
 /// the Claim and From<> for serde_cbor::Value traits.
 /// Custom value_type's must implement From<value_type> for serde_cbor::Value.
+#[allow(unused_macros)]
 macro_rules! define_header {
     ($name:ident, $value_type: ty, $key: expr) => {
         #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, PartialOrd, Eq, Ord, Hash)]
