@@ -12,10 +12,10 @@ use std::ops::Deref;
 pub struct HeaderMap(BTreeMap<Key, Value>);
 
 impl HeaderMap {
-    /// Insert a defined CWT header struct.
+    /// Insert a defined CWT header parameter.
     /// Returns an error if the previous value found cannot be parsed
     /// into the expected header structure.
-    pub fn insert_claim<T: Header>(&mut self, claim: T) -> Result<Option<T>, Error> {
+    pub fn insert_header<T: Header>(&mut self, claim: T) -> Result<Option<T>, Error> {
         match self.0.insert(T::key(), claim.into()) {
             None => Ok(None),
             Some(v) => v.try_into().map_or_else(
@@ -55,10 +55,10 @@ impl HeaderMap {
         self.0.get(&Key::Text(label.into()))
     }
 
-    /// Remove a defined CWT header struct.
+    /// Remove a defined CWT header parameter.
     /// Returns an error if the removed value cannot be parsed into
     /// the expected header structure.
-    pub fn remove_claim<T: Header>(&mut self) -> Result<Option<T>, Error> {
+    pub fn remove_header<T: Header>(&mut self) -> Result<Option<T>, Error> {
         match self.0.remove(&T::key()) {
             None => Ok(None),
             Some(v) => v.try_into().map_or_else(
@@ -78,7 +78,7 @@ impl HeaderMap {
         self.0.remove(&Key::Integer(key.into()))
     }
 
-    /// Remove a claim value with a text key.
+    /// Remove a header value with a text key.
     pub fn remove_t<T: Into<String>>(&mut self, key: T) -> Option<Value> {
         self.0.remove(&Key::Text(key.into()))
     }
