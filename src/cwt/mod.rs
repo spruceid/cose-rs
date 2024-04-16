@@ -3,6 +3,7 @@ pub mod claim;
 use serde::{Deserialize, Serialize};
 use serde_cbor::Value;
 use std::collections::BTreeMap;
+use std::ops::Deref;
 
 pub use crate::cwt::claim::{Claim, Key, NumericDate};
 
@@ -26,6 +27,11 @@ impl ClaimsSet {
                 |claim| Ok(Some(claim)),
             ),
         }
+    }
+
+    /// Insert a claim with a given key.
+    pub fn insert<T: Into<Key>>(&mut self, key: T, value: Value) -> Option<Value> {
+        self.0.insert(key.into(), value)
     }
 
     /// Insert a claim with an integer key.
@@ -52,6 +58,11 @@ impl ClaimsSet {
         }
     }
 
+    /// Retrieve a claim value with a given key.
+    pub fn get<T: Into<Key>>(&self, key: T) -> Option<&Value> {
+        self.0.get(&key.into())
+    }
+
     /// Retrieve a claim value with an integer key.
     pub fn get_i<T: Into<i128>>(&self, key: T) -> Option<&Value> {
         self.0.get(&Key::Integer(key.into()))
@@ -75,6 +86,11 @@ impl ClaimsSet {
         }
     }
 
+    /// Remove a claim value with a given key from ClaimsSet.
+    pub fn remove<T: Into<Key>>(&mut self, key: T) -> Option<Value> {
+        self.0.remove(&key.into())
+    }
+
     /// Remove a claim value with an integer key from ClaimsSet.
     pub fn remove_i<T: Into<i128>>(&mut self, key: T) -> Option<Value> {
         self.0.remove(&Key::Integer(key.into()))
@@ -96,9 +112,9 @@ impl ClaimsSet {
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("unable to serialize CWT ClaimsSet: {0}")]
-    UnableToSerializeClaimsSet(serde_cbor::Error),
+    UnableToSerializeClaimsSet(#[from] serde_cbor::Error),
     #[error("unable to parse value into claim: {0}")]
-    UnableToParseClaim(claim::Error),
+    UnableToParseClaim(#[from] claim::Error),
     #[error("found invalid CWT Key: ${0}")]
     InvalidCwtKey(String),
 }
@@ -116,6 +132,19 @@ impl TryFrom<BTreeMap<Value, Value>> for ClaimsSet {
         m.into_iter()
             .map(|(k, v)| Ok((Key::try_from(k)?, v)))
             .collect()
+    }
+}
+
+impl From<BTreeMap<Key, Value>> for ClaimsSet {
+    fn from(m: BTreeMap<Key, Value>) -> Self {
+        Self(m)
+    }
+}
+
+impl Deref for ClaimsSet {
+    type Target = BTreeMap<Key, Value>;
+    fn deref(&self) -> &BTreeMap<Key, Value> {
+        &self.0
     }
 }
 
