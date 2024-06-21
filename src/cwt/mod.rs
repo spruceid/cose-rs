@@ -299,10 +299,15 @@ mod test {
         let issuer = claim::Issuer::new("test text".into());
         let exp = claim::ExpirationTime::new(NumericDate::IntegerSeconds(1444064944));
         let cwt_id = claim::CWTId::new(hex::decode("0b71").unwrap());
+        let status = claim::ietf_token_status::ReferencedTokenStatus::new(
+            5.into(),
+            "http://example.com".to_string().into(),
+        );
 
         test_get_claim(issuer, "issuer (String value)");
         test_get_claim(exp, "expiration time (NumericDate value)");
         test_get_claim(cwt_id, "CWT ID (Bytes value)");
+        test_get_claim(status, "Status (nested BTree)");
     }
 
     #[test]
