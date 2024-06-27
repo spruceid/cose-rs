@@ -1,3 +1,5 @@
+pub mod ietf_token_status;
+
 use serde::{Deserialize, Serialize};
 use serde_cbor::Value;
 
