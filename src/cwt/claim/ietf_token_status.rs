@@ -8,11 +8,11 @@ use serde_cbor::Value;
 /// its location in the Status List.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct Status {
-    pub status_list: StatusList,
+    pub status_list: StatusListInfo,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, PartialOrd, Eq, Ord, Hash)]
-pub struct StatusList {
+pub struct StatusListInfo {
     pub idx: u32,
     pub uri: String,
 }
@@ -20,7 +20,7 @@ pub struct StatusList {
 impl Status {
     pub fn new(idx: u32, uri: String) -> Self {
         Status {
-            status_list: StatusList { idx, uri },
+            status_list: StatusListInfo { idx, uri },
         }
     }
 }
