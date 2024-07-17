@@ -2,21 +2,28 @@
 name = "cose-rs"
 version = "0.1.0"
 edition = "2021"
-description = "Pure rust implemenation of RFC-8152, using the `Signer` and `Verifier` traits from RustCrypto's `signature` crate to abstract over cryptographic backend."
+description = """
+Pure rust implemenation of [RFC-8152](https://datatracker.ietf.org/doc/html/rfc8152),
+ using the `Signer` and `Verifier` traits from RustCrypto's `signature` crate, `hmac` crate for `HMAC`, `cbc_mac` and `aes` crates for `AES-CBC-MAC`
+ to abstract over cryptographic backend. Currently only implements `COSE_Sign1` and `COSE_MAC0`.
+"""
 readme = "README.md"
 homepage = "https://github.com/spruceid/cose-rs"
 repository = "https://github.com/spruceid/cose-rs"
+documentation = "https://docs.rs/cose-rs"
 license = "Apache-2.0"
 
 [features]
-default = ["p256", "p384"]
-async = ["async-signature"]
+default = ["p256", "p384", "hmac", "aes-cbc-mac"]
+async = ["async-signature", "async-trait"]
 time = ["dep:time", "dep:fmul-to-int"]
 p256 = ["dep:p256"]
 p384 = ["dep:p384"]
+hmac = ["dep:hmac", "dep:sha2", "dep:hex", "dep:digest"]
+aes-cbc-mac = ["dep:cbc-mac", "dep:aes"]
 
 [dependencies]
-async-signature = { version = "0.3.0", optional = true }
+async-signature = { version = "0.5.1", optional = true }
 fmul-to-int = { version = "1.0.0", optional = true }
 p256 = { version = "0.13.0", optional = true }
 p384 = { version = "0.13.0", optional = true }
@@ -26,7 +33,20 @@ serde_cbor = { version = "0.11.2", features = ["tags"] }
 signature = "2.0"
 time = { version = "0.3.32", optional = true }
 thiserror = "1.0"
+hmac = { version = "0.12.1", optional = true }
+sha2 = { version = "0.10.8", optional = true }
+digest = { version = "0.10.7", optional = true }
+async-trait = { version = "0.1.81", optional = true }
+hex = { version = "0.4.3", optional = true }
+cbc-mac = { version = "0.1.1", optional = true }
+aes = { version = "0.8.4", optional = true }
 
 [dev-dependencies]
 hex = "0.4.3"
 p256 = { version = "0.13.0" }
+hmac = { version = "0.12.1" }
+sha2 = { version = "0.10.8" }
+digest = { version = "0.10.7" }
+tokio = { version = "1.38.1", features = ["full"] }
+cbc-mac = { version = "0.1.1" }
+aes = "0.8.4"

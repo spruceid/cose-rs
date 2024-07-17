@@ -1,8 +1,10 @@
-use crate::header_map::Header;
-use serde::de::Error;
-use serde_cbor::Value;
 use std::convert::TryFrom;
 use std::fmt;
+
+use serde::de::Error;
+use serde_cbor::Value;
+
+use crate::header_map::Header;
 
 /// Trait to represent the signature algorithm of a signer or verifier.
 pub trait SignatureAlgorithm {
@@ -395,8 +397,9 @@ impl TryFrom<Value> for Algorithm {
 
 #[cfg(feature = "p256")]
 mod p256 {
-    use super::{Algorithm, SignatureAlgorithm};
     use p256::ecdsa::{SigningKey, VerifyingKey};
+
+    use super::{Algorithm, SignatureAlgorithm};
 
     impl SignatureAlgorithm for SigningKey {
         fn algorithm(&self) -> Algorithm {
@@ -413,8 +416,9 @@ mod p256 {
 
 #[cfg(feature = "p384")]
 mod p384 {
-    use super::{Algorithm, SignatureAlgorithm};
     use p384::ecdsa::{SigningKey, VerifyingKey};
+
+    use super::{Algorithm, SignatureAlgorithm};
 
     impl SignatureAlgorithm for SigningKey {
         fn algorithm(&self) -> Algorithm {
@@ -425,6 +429,190 @@ mod p384 {
     impl SignatureAlgorithm for VerifyingKey {
         fn algorithm(&self) -> Algorithm {
             Algorithm::ES384
+        }
+    }
+}
+
+#[cfg(feature = "hmac")]
+mod hmac {
+    use digest::{
+        block_buffer::Eager,
+        core_api::{BlockSizeUser, BufferKindUser, CoreProxy, FixedOutputCore, UpdateCore},
+        generic_array::typenum::{IsLess, Le, NonZero, U256},
+        HashMarker,
+    };
+    use hmac::{Hmac, Mac};
+    use sha2::{Sha256, Sha384, Sha512};
+
+    use crate::algorithm::{Algorithm, SignatureAlgorithm};
+    use crate::common::{Signer, Verifier};
+    use crate::mac0::Error;
+
+    /// Implement [`SignatureAlgorithm`] for each `HMAC` variant.
+
+    impl SignatureAlgorithm for Hmac<Sha256> {
+        fn algorithm(&self) -> Algorithm {
+            Algorithm::HMAC_256_256
+        }
+    }
+
+    impl SignatureAlgorithm for Hmac<Sha384> {
+        fn algorithm(&self) -> Algorithm {
+            Algorithm::HMAC_384_384
+        }
+    }
+
+    impl SignatureAlgorithm for Hmac<Sha512> {
+        fn algorithm(&self) -> Algorithm {
+            Algorithm::HMAC_512_512
+        }
+    }
+
+    /// Helper fn for `sign` and `verify`.
+
+    fn try_sign<D>(this: &Hmac<D>, msg: &[u8]) -> Result<Vec<u8>, Error>
+    where
+        D: CoreProxy,
+        D::Core: HashMarker
+            + UpdateCore
+            + FixedOutputCore
+            + BufferKindUser<BufferKind = Eager>
+            + Default
+            + Clone,
+        <D::Core as BlockSizeUser>::BlockSize: IsLess<U256>,
+        Le<<D::Core as BlockSizeUser>::BlockSize, U256>: NonZero,
+    {
+        let mut mac = this.clone();
+        mac.reset();
+        mac.update(msg);
+        let res = mac.finalize().into_bytes().to_vec();
+        Ok(res)
+    }
+
+    fn verify<D>(this: &Hmac<D>, msg: &[u8], signature: &[u8]) -> Result<(), Error>
+    where
+        D: CoreProxy,
+        D::Core: HashMarker
+            + UpdateCore
+            + FixedOutputCore
+            + BufferKindUser<BufferKind = Eager>
+            + Default
+            + Clone,
+        <D::Core as BlockSizeUser>::BlockSize: IsLess<U256>,
+        Le<<D::Core as BlockSizeUser>::BlockSize, U256>: NonZero,
+    {
+        let mut mac = this.clone();
+        mac.reset();
+        mac.update(msg);
+        mac.verify_slice(signature).map_err(Error::Signing)
+    }
+
+    /// Implement [`Signer`] for each `HMAC` variant.
+
+    impl Signer<Vec<u8>, Error> for Hmac<Sha256> {
+        fn try_sign(&self, msg: &[u8]) -> Result<Vec<u8>, Error> {
+            try_sign(self, msg)
+        }
+    }
+
+    impl Signer<Vec<u8>, Error> for Hmac<Sha384> {
+        fn try_sign(&self, msg: &[u8]) -> Result<Vec<u8>, Error> {
+            try_sign(self, msg)
+        }
+    }
+
+    impl Signer<Vec<u8>, Error> for Hmac<Sha512> {
+        fn try_sign(&self, msg: &[u8]) -> Result<Vec<u8>, Error> {
+            try_sign(self, msg)
+        }
+    }
+
+    /// Implement [`Verifier`] for each `HMAC` variant.
+
+    impl Verifier<Vec<u8>, Error> for Hmac<Sha256> {
+        fn verify(&self, msg: &[u8], signature: &Vec<u8>) -> Result<(), Error> {
+            verify(self, msg, signature)
+        }
+    }
+
+    impl Verifier<Vec<u8>, Error> for Hmac<Sha384> {
+        fn verify(&self, msg: &[u8], signature: &Vec<u8>) -> Result<(), Error> {
+            verify(self, msg, signature)
+        }
+    }
+
+    impl Verifier<Vec<u8>, Error> for Hmac<Sha512> {
+        fn verify(&self, msg: &[u8], signature: &Vec<u8>) -> Result<(), Error> {
+            verify(self, msg, signature)
+        }
+    }
+}
+
+#[cfg(feature = "aes-cbc-mac")]
+mod aes_cbc_mac {
+    use aes::{Aes128, Aes256};
+    use cbc_mac::CbcMac;
+    use digest::Mac;
+
+    use crate::algorithm::{Algorithm, SignatureAlgorithm};
+    use crate::common::{Signer, Verifier};
+    use crate::mac0::Error;
+
+    type Aes128CbcMac = CbcMac<Aes128>;
+    type Aes256CbcMac = CbcMac<Aes256>;
+
+    /// Implement [`SignatureAlgorithm`] for each `AES-CBC-MAC` variant.
+
+    impl SignatureAlgorithm for Aes128CbcMac {
+        fn algorithm(&self) -> Algorithm {
+            Algorithm::AES_MAC_128_128
+        }
+    }
+
+    impl SignatureAlgorithm for Aes256CbcMac {
+        fn algorithm(&self) -> Algorithm {
+            Algorithm::AES_MAC_256_128
+        }
+    }
+
+    /// Implement [`Signer`] for each `AES-CBC-MAC` variant.
+
+    impl Signer<Vec<u8>, Error> for Aes128CbcMac {
+        fn try_sign(&self, msg: &[u8]) -> Result<Vec<u8>, Error> {
+            let mut cbc = self.clone();
+            cbc.reset();
+            cbc.update(msg);
+            let res = cbc.finalize().into_bytes().to_vec();
+            Ok(res)
+        }
+    }
+
+    impl Signer<Vec<u8>, Error> for Aes256CbcMac {
+        fn try_sign(&self, msg: &[u8]) -> Result<Vec<u8>, Error> {
+            let mut cbc = self.clone();
+            cbc.reset();
+            cbc.update(msg);
+            let res = cbc.finalize().into_bytes().to_vec();
+            Ok(res)
+        }
+    }
+
+    /// Implement [`Verifier`] for each `AES-CBC-MAC` variant.
+
+    impl Verifier<Vec<u8>, Error> for Aes128CbcMac {
+        fn verify(&self, msg: &[u8], signature: &Vec<u8>) -> Result<(), Error> {
+            let mut cbc = self.clone();
+            cbc.reset();
+            cbc.update(msg);
+            cbc.verify_slice(signature).map_err(Error::Signing)
+        }
+    }
+    impl Verifier<Vec<u8>, Error> for Aes256CbcMac {
+        fn verify(&self, msg: &[u8], signature: &Vec<u8>) -> Result<(), Error> {
+            let mut cbc = self.clone();
+            cbc.reset();
+            cbc.update(msg);
+            cbc.verify_slice(signature).map_err(Error::Signing)
         }
     }
 }
