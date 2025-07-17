@@ -2,14 +2,20 @@ pub use crate::cwt::{
     claim::{Claim, Key},
     Error,
 };
-use serde::{de::Error as _, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_cbor::Value;
 use std::collections::BTreeMap;
 use std::ops::Deref;
 
+pub mod headers;
+
 /// COSE headers.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct HeaderMap(BTreeMap<Key, Value>);
+
+pub trait Header: Into<Value> + TryFrom<Value, Error = serde_cbor::Error> {
+    fn key() -> Key;
+}
 
 impl HeaderMap {
     /// Insert a defined CWT header parameter.
@@ -128,86 +134,4 @@ impl IntoIterator for HeaderMap {
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
-}
-
-pub trait Header: Into<Value> + TryFrom<Value, Error = serde_cbor::Error> {
-    fn key() -> Key;
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, PartialOrd, Eq, Ord, Hash)]
-#[serde(untagged)]
-pub enum X5Chain {
-    One(Vec<u8>),
-    Many(Vec<Vec<u8>>),
-}
-
-impl Header for X5Chain {
-    fn key() -> Key {
-        Key::Integer(33)
-    }
-}
-
-impl From<X5Chain> for Value {
-    fn from(value: X5Chain) -> Self {
-        match value {
-            X5Chain::One(v) => v.into(),
-            X5Chain::Many(v) => v
-                .into_iter()
-                .map(Value::Bytes)
-                .collect::<Vec<Value>>()
-                .into(),
-        }
-    }
-}
-
-impl TryFrom<Value> for X5Chain {
-    type Error = serde_cbor::Error;
-
-    fn try_from(value: Value) -> Result<Self, Self::Error> {
-        match value {
-            Value::Bytes(v) => Ok(X5Chain::One(v)),
-            Value::Array(v) => v
-                .into_iter()
-                .map(serde_cbor::value::from_value)
-                .collect::<Result<Vec<Vec<u8>>, serde_cbor::Error>>()
-                .map(X5Chain::Many),
-            _ => Err(serde_cbor::Error::custom("Invalid X5Chain value")),
-        }
-    }
-}
-
-/// Simple macro for defining generic claims with implementations of
-/// the Claim and From<> for serde_cbor::Value traits.
-/// Custom value_type's must implement From<value_type> for serde_cbor::Value.
-#[allow(unused_macros)]
-macro_rules! define_header {
-    ($name:ident, $value_type: ty, $key: expr) => {
-        #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, PartialOrd, Eq, Ord, Hash)]
-        pub struct $name($value_type);
-        impl $name {
-            pub fn new(value: $value_type) -> $name {
-                $name(value)
-            }
-        }
-
-        impl Header for $name {
-            fn key() -> Key {
-                $key
-            }
-        }
-
-        impl From<$name> for Value {
-            fn from(value: $name) -> Self {
-                value.0.into()
-            }
-        }
-
-        impl TryFrom<Value> for $name {
-            type Error = serde_cbor::Error;
-
-            fn try_from(value: Value) -> Result<Self, Self::Error> {
-                Ok(Self(serde_cbor::value::from_value(value)?))
-            }
-        }
-    };
 }
