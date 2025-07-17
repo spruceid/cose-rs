@@ -80,3 +80,23 @@ impl TryFrom<Value> for KeyId {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::{super::HeaderMap, *};
+
+    #[test]
+    fn test_key_id() {
+        let mut header_map = HeaderMap::default();
+        let key_id_bstr = b"test key ID";
+        let key_id = KeyId::new(key_id_bstr);
+        header_map
+            .insert_header(key_id)
+            .expect("failed to insert key ID");
+        let retrieved = header_map
+            .remove_header::<KeyId>()
+            .expect("failed to remove key ID")
+            .expect("key ID not found");
+        assert_eq!(retrieved.0, key_id_bstr);
+    }
+}
