@@ -35,10 +35,7 @@ impl TryFrom<Value> for Key {
         match value {
             Value::Text(s) => Ok(Key::Text(s)),
             Value::Integer(i) => Ok(Key::Integer(i)),
-            invalid_key_type => Err(Self::Error::InvalidCwtKey(format!(
-                "{:?}",
-                invalid_key_type
-            ))),
+            invalid_key_type => Err(Self::Error::InvalidCwtKey(format!("{invalid_key_type:?}"))),
         }
     }
 }

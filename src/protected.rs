@@ -35,10 +35,7 @@ impl<'de> de::Deserialize<'de> for Protected {
                 };
                 Ok(Protected(header_map, Some(header_map_bytes)))
             }
-            v => Err(D::Error::custom(format!(
-                "expected byte str, found: {:?}",
-                v
-            ))),
+            v => Err(D::Error::custom(format!("expected byte str, found: {v:?}"))),
         }
     }
 }
