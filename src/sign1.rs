@@ -342,7 +342,7 @@ impl Builder {
     #[cfg(feature = "async")]
     pub async fn sign_async<S, Sig>(mut self, s: &S) -> Result<CoseSign1>
     where
-        S: async_signature::AsyncSigner<Sig> + SignatureAlgorithm,
+        S: signature::AsyncSigner<Sig> + SignatureAlgorithm,
         Sig: SignatureEncoding + Send + 'static,
     {
         if self.protected.get_i(1).is_none() {
