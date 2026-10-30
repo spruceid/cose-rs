@@ -1,0 +1,25 @@
+# Configuration for `cargo deny`; CI runs `cargo deny check licenses`.
+# See https://embarkstudios.github.io/cargo-deny/checks/licenses/cfg.html
+
+[graph]
+# Check every feature's dependencies, as CI builds and tests with --all-features.
+all-features = true
+
+[licenses]
+# Same allow list as the other SpruceID crates (e.g. openid4vp).
+allow = [
+    "Apache-2.0", # Permissive, files are untouched
+    "BSD-2-Clause", # Permissive, files are untouched
+    "BSD-3-Clause", # Permissive, files are untouched
+    "CC0-1.0", # Public domain, files are untouched
+    "CDLA-Permissive-2.0", # Permissive, data is untouched
+    "ISC", # Permissive, files are untouched
+    "MIT", # Permissive, files are untouched
+    "MPL-2.0", # Permissive, files are untouched
+    "Unicode-3.0", # Permissive, files are untouched
+]
+confidence-threshold = 0.8
+exceptions = [
+    # Hasher used by serde_json >= 1.0.154.
+    { allow = ["Zlib"], crate = "foldhash" },
+]
