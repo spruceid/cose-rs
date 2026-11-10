@@ -236,17 +236,14 @@ mod test {
     #[test]
     fn numeric_date_to_offset_fails() {
         let cases = [
-            ("i128 max", NumericDate::IntegerSeconds(std::i128::MAX)),
-            ("i128 min", NumericDate::IntegerSeconds(std::i128::MIN)),
-            ("f64 max", NumericDate::FractionalSeconds(std::f64::MAX)),
-            ("f64 min", NumericDate::FractionalSeconds(std::f64::MIN)),
-            (
-                "f64 inf",
-                NumericDate::FractionalSeconds(std::f64::INFINITY),
-            ),
+            ("i128 max", NumericDate::IntegerSeconds(i128::MAX)),
+            ("i128 min", NumericDate::IntegerSeconds(i128::MIN)),
+            ("f64 max", NumericDate::FractionalSeconds(f64::MAX)),
+            ("f64 min", NumericDate::FractionalSeconds(f64::MIN)),
+            ("f64 inf", NumericDate::FractionalSeconds(f64::INFINITY)),
             (
                 "f64 -inf",
-                NumericDate::FractionalSeconds(std::f64::NEG_INFINITY),
+                NumericDate::FractionalSeconds(f64::NEG_INFINITY),
             ),
         ];
         for (case, nd) in cases {

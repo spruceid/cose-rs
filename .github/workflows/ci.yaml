@@ -17,6 +17,13 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v2
 
+    - uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-machete
+    - uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-deny
+
     - name: Build
       run: cargo build --all-features
 
@@ -28,3 +35,9 @@ jobs:
 
     - name: Fmt
       run: cargo fmt -- --check
+
+    - name: Unused dependencies
+      run: cargo machete
+
+    - name: Check dependencies licences are compatible
+      run: cargo deny check licenses
